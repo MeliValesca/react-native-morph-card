@@ -1,0 +1,29 @@
+{
+  "name": "morph-card-example",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android --scheme morph-card-example",
+    "ios": "react-native run-ios --scheme morph-card-example",
+    "start": "react-native start",
+    "build:android": "react-native bundle --entry-file index.js --platform android --dev false --bundle-output dist/main.android.jsbundle --assets-dest dist/res",
+    "build:ios": "react-native bundle --entry-file index.js --platform ios --dev false --bundle-output dist/main.ios.jsbundle --assets-dest dist/assets"
+  },
+  "dependencies": {
+    "@react-navigation/native": "^7.1.33",
+    "@react-navigation/native-stack": "^7.14.5",
+    "react": "19.1.0",
+    "react-native": "^0.80.1",
+    "react-native-morph-card": "link:..",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.24.0"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "^19.0.0",
+    "@react-native/babel-preset": "^0.80.0",
+    "@react-native/metro-config": "^0.80.0",
+    "@react-native/typescript-config": "^0.80.0",
+    "react-native-test-app": "^4.3.15",
+    "typescript": "^5.5.0"
+  }
+}

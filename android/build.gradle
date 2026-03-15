@@ -1,0 +1,55 @@
+buildscript {
+  ext.safeExtGet = { prop, fallback ->
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+def newArchEnabled = project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+
+android {
+  namespace "com.melivalesca.morphcard"
+  compileSdkVersion safeExtGet('compileSdkVersion', 34)
+
+  defaultConfig {
+    minSdkVersion safeExtGet('minSdkVersion', 21)
+    targetSdkVersion safeExtGet('targetSdkVersion', 34)
+  }
+
+  sourceSets.main {
+    java {
+      if (newArchEnabled) {
+        srcDirs += 'src/fabric/java'
+      } else {
+        srcDirs += 'src/paper/java'
+      }
+    }
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+}
+
+repositories {
+  mavenCentral()
+  google()
+}
+
+dependencies {
+  implementation "com.facebook.react:react-native:+"
+}
+
+if (newArchEnabled) {
+  apply plugin: "com.facebook.react"
+}
+
+apply plugin: 'com.diffplug.spotless'
+spotless {
+  kotlin {
+    target '**/*.kt'
+    googleJavaFormat()
+  }
+}

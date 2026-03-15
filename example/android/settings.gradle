@@ -1,0 +1,22 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+    }
+}
+
+apply(from: {
+    def search = rootDir.toPath()
+    do {
+        def module = search.resolve("node_modules/react-native-test-app/test-app.gradle")
+        if (module.toFile().exists()) {
+            return module.toRealPath().toString()
+        }
+    } while (search = search.getParent())
+    throw new GradleException("Could not find `react-native-test-app`!")
+}())
+
+applyTestAppSettings(settings)
+
+rootProject.name = "morph-card-example"

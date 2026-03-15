@@ -1,0 +1,33 @@
+buildscript {
+    apply(from: {
+        def search = rootDir.toPath()
+        do {
+            def module = search.resolve("node_modules/react-native-test-app/android/dependencies.gradle")
+            if (module.toFile().exists()) {
+                return module.toRealPath().toString()
+            }
+        } while (search = search.getParent())
+        throw new GradleException("Could not find `react-native-test-app`!")
+    }())
+
+    repositories {
+        mavenCentral()
+        google()
+    }
+
+    dependencies {
+        getReactNativeDependencies().each { dependency ->
+            classpath(dependency)
+        }
+    }
+}
+
+allprojects {
+    repositories {
+        maven {
+            url("${rootDir}/../node_modules/react-native/android")
+        }
+        mavenCentral()
+        google()
+    }
+}

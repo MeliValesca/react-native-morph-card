@@ -1,0 +1,28 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+
+# Build
+lib/
+
+# iOS
+ios/build/
+**/Pods/
+**/build/generated/
+
+# Android
+android/build/
+android/.gradle/
+android/local.properties
+
+# IDE
+.idea/
+.vscode/
+*.xcworkspace
+*.xcuserdata
+
+# Misc
+*.log
+*.tgz

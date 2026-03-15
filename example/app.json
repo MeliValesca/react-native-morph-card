@@ -1,0 +1,23 @@
+{
+  "name": "morph-card-example",
+  "displayName": "morph-card-example",
+  "singleApp": "morph-card-example",
+  "components": [
+    {
+      "appKey": "morph-card-example",
+      "slug": "morph-card-example",
+      "displayName": "morph-card-example"
+    }
+  ],
+  "resources": {
+    "android": ["dist/res", "dist/main.android.jsbundle"],
+    "ios": ["dist/assets", "dist/main.ios.jsbundle"]
+  },
+  "ios": {
+    "plist": {
+      "NSAppTransportSecurity": {
+        "NSAllowsArbitraryLoads": true
+      }
+    }
+  }
+}
