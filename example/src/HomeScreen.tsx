@@ -51,7 +51,7 @@ export default function HomeScreen() {
       >
         <MorphCardSource
           ref={blueCardRef}
-          duration={500}
+          duration={200}
           backgroundColor="#007AFF"
           borderRadius={16}
           shadowColor="#000"
@@ -103,7 +103,7 @@ export default function HomeScreen() {
           style={{
             width: 140,
             borderRadius: 16,
-            backgroundColor: 'blue',
+            backgroundColor: '#f1f1f1ff',
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.15,
@@ -114,7 +114,7 @@ export default function HomeScreen() {
           {/* Only the image morphs — not the whole card */}
           <MorphCardSource
             ref={catCardRef}
-            duration={500}
+            duration={200}
             width={140}
             height={100}
             borderRadius={10}

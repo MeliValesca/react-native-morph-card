@@ -14,14 +14,12 @@ export default function BlueDetailScreen({ route, navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Just a position/size marker — the source card's content
-          is snapshotted and animated here by the native side */}
-
       <MorphCardTarget
         sourceTag={route.params.sourceTag}
+        duration={200}
         width={'100%'}
+        borderRadius={0}
         height={240}
-        // contentOffsetY={60}
         contentCentered
       />
       <Text

@@ -28,6 +28,23 @@ using namespace facebook::react;
   [super didMoveToWindow];
   if (self.window) {
     [[RNCMorphCardViewRegistry shared] registerView:self withTag:self.tag];
+
+    // Immediately hide the detail screen container to prevent flicker.
+    // The expand animation will fade it back in.
+    UIWindow *window = self.window;
+    CGRect windowBounds = window.bounds;
+    UIView *current = self.superview;
+    UIView *screenContainer = nil;
+    while (current && current != window) {
+      CGRect frameInWindow = [current convertRect:current.bounds toView:nil];
+      if (CGRectEqualToRect(frameInWindow, windowBounds)) {
+        screenContainer = current;
+      }
+      current = current.superview;
+    }
+    if (screenContainer) {
+      screenContainer.alpha = 0;
+    }
   } else {
     [[RNCMorphCardViewRegistry shared] unregisterViewWithTag:self.tag];
   }

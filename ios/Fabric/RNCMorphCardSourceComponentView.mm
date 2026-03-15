@@ -135,17 +135,11 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
   // ── 2. Snapshot the card ──
   UIImage *cardImage = [self captureSnapshot];
 
-  // ── 3. Keep source screen visible, hide detail screen ──
+  // ── 3. Keep source screen visible during navigation transition ──
   UIView *sourceScreen = findScreenContainer(self);
-  UIView *targetScreen = findScreenContainer(targetView);
   _sourceScreenContainer = sourceScreen;
-  _targetScreenContainer = targetScreen;
+  _targetScreenContainer = findScreenContainer(targetView);
 
-  // Hide detail screen so it doesn't flash
-  if (targetScreen) {
-    targetScreen.alpha = 0;
-  }
-  // Force source screen to stay visible during navigation transition
   if (sourceScreen) {
     sourceScreen.alpha = 1;
   }
@@ -217,16 +211,22 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
                                            contentSize.height);
               }];
 
-    [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
-      [UIView animateWithDuration:0.2
-          animations:^{
-            if (targetScreen) {
-              targetScreen.alpha = 1;
-            }
+    // Start fading in screen content at 60% of the animation
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.6 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          UIView *ts = self->_targetScreenContainer;
+          if (ts) {
+            [UIView animateWithDuration:dur * 0.4
+                animations:^{
+                  ts.alpha = 1;
+                }
+                completion:nil];
           }
-          completion:^(BOOL finished) {
-            resolve(@(YES));
-          }];
+        });
+
+    [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
+      resolve(@(YES));
     }];
 
     [animator startAnimation];
@@ -258,16 +258,22 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
                 snapshot.layer.shadowOpacity = 0;
               }];
 
-    [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
-      [UIView animateWithDuration:0.2
-          animations:^{
-            if (targetScreen) {
-              targetScreen.alpha = 1;
-            }
+    // Start fading in screen content at 60% of the animation
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.6 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          UIView *ts = self->_targetScreenContainer;
+          if (ts) {
+            [UIView animateWithDuration:dur * 0.4
+                animations:^{
+                  ts.alpha = 1;
+                }
+                completion:nil];
           }
-          completion:^(BOOL finished) {
-            resolve(@(YES));
-          }];
+        });
+
+    [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
+      resolve(@(YES));
     }];
 
     [animator startAnimation];
