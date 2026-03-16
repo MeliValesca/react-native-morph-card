@@ -26,6 +26,7 @@ export default function GalleryScreen() {
             <MorphCardSource
               scaleMode="aspectFit"
               borderRadius={0}
+              duration={300}
               onPress={(sourceTag) =>
                 navigation.navigate('GalleryDetail', { sourceTag })
               }

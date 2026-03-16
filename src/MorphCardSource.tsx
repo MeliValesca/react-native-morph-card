@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Pressable,
   type ViewStyle,
+  type DimensionValue,
   View,
   findNodeHandle,
 } from 'react-native';
@@ -15,8 +16,8 @@ export type ScaleMode = 'aspectFill' | 'aspectFit' | 'stretch';
 export interface MorphCardSourceProps {
   ref?: React.Ref<any>;
   duration?: number;
-  width?: number;
-  height?: number;
+  width?: DimensionValue;
+  height?: DimensionValue;
   borderRadius?: number;
   backgroundColor?: string;
   /** How the snapshot scales in no-wrapper mode (no backgroundColor). Default: 'aspectFill' */
@@ -40,9 +41,12 @@ export const MorphCardSource = ({
   React.useImperativeHandle(ref, () => nativeRef.current);
 
   const style: ViewStyle = {};
-  if (width != null) style.width = width;
-  if (height != null) style.height = height;
-  if (borderRadius != null) style.borderRadius = borderRadius;
+  if (width != null) style.width = width as ViewStyle['width'];
+  if (height != null) style.height = height as ViewStyle['height'];
+  if (borderRadius != null) {
+    style.borderRadius = borderRadius;
+    style.overflow = 'hidden';
+  }
   if (backgroundColor != null) style.backgroundColor = backgroundColor;
   const handlePress = React.useCallback(() => {
     if (!onPress) return;

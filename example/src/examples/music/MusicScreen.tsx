@@ -44,17 +44,22 @@ export default function MusicScreen() {
       >
         {albums.map((album, index) => (
           <View key={album.title} style={{ width: '48%', marginBottom: 24 }}>
-            <MorphCardSource
-              borderRadius={12}
-              onPress={(sourceTag) =>
-                navigation.navigate('MusicDetail', { sourceTag, album })
-              }
-            >
-              <Image
-                source={albumImages[index]}
-                style={{ width: '100%', aspectRatio: 1, borderRadius: 12 }}
-              />
-            </MorphCardSource>
+            <View style={{ aspectRatio: 1 }}>
+              <MorphCardSource
+                borderRadius={150}
+                width={'100%'}
+                height={'100%'}
+                onPress={(sourceTag) =>
+                  navigation.navigate('MusicDetail', { sourceTag, album })
+                }
+              >
+                <Image
+                  source={albumImages[index]}
+                  resizeMode="cover"
+                  style={{ width: '100%', height: '100%' }}
+                />
+              </MorphCardSource>
+            </View>
             <Text
               style={{
                 fontSize: 14,

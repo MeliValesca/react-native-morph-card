@@ -128,14 +128,24 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 #pragma mark - Snapshot helper
 
 - (UIImage *)captureSnapshot {
+  // Render children directly into a fresh context so the snapshot
+  // captures full rectangular content without the source view's
+  // cornerRadius clipping. No on-screen flash since we never
+  // modify visible properties.
   UIGraphicsImageRendererFormat *format =
       [UIGraphicsImageRendererFormat defaultFormat];
   format.opaque = NO;
+  CGSize size = self.bounds.size;
   UIGraphicsImageRenderer *renderer =
-      [[UIGraphicsImageRenderer alloc] initWithSize:self.bounds.size
-                                             format:format];
+      [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
   return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
-    [self drawViewHierarchyInRect:self.bounds afterScreenUpdates:NO];
+    for (UIView *child in self.subviews) {
+      CGContextSaveGState(ctx.CGContext);
+      CGContextTranslateCTM(ctx.CGContext, child.frame.origin.x, child.frame.origin.y);
+      [child drawViewHierarchyInRect:(CGRect){CGPointZero, child.frame.size}
+                  afterScreenUpdates:NO];
+      CGContextRestoreGState(ctx.CGContext);
+    }
   }];
 }
 
@@ -440,42 +450,46 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       _wrapperView = wrapper;
     }
 
-    [UIView animateWithDuration:dur * 0.3
-        animations:^{
-          if (targetScreen) {
-            targetScreen.alpha = 0;
-          }
-        }
-        completion:^(BOOL finished) {
-          if (sourceScreen) {
-            sourceScreen.alpha = 1;
-          }
+    // Show source screen underneath before starting collapse
+    if (sourceScreen) {
+      sourceScreen.alpha = 1;
+    }
 
-          UIView *content = wrapper.subviews.firstObject;
+    UIView *content = wrapper.subviews.firstObject;
 
-          UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
-              initWithDuration:dur
-                  dampingRatio:0.85
-                    animations:^{
-                      wrapper.frame = self->_cardFrame;
-                      wrapper.layer.cornerRadius = self->_cardCornerRadius;
-                      if (content) {
-                        content.frame = (CGRect){CGPointZero, content.frame.size};
-                      }
-                    }];
+    UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
+        initWithDuration:dur
+            dampingRatio:0.85
+              animations:^{
+                wrapper.frame = self->_cardFrame;
+                wrapper.layer.cornerRadius = self->_cardCornerRadius;
+                if (content) {
+                  content.frame = (CGRect){CGPointZero, content.frame.size};
+                }
+              }];
 
-          [animator addCompletion:^(UIViewAnimatingPosition pos) {
-            [wrapper removeFromSuperview];
-            self->_wrapperView = nil;
-            self.alpha = 1;
-            self->_isExpanded = NO;
-            self->_sourceScreenContainer = nil;
-            self->_targetScreenContainer = nil;
-            resolve(@(YES));
-          }];
+    // Fade out target screen concurrently at 15% (mirrors expand's fade-in)
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          [UIView animateWithDuration:dur * 0.5
+              animations:^{
+                if (targetScreen) { targetScreen.alpha = 0; }
+              }
+              completion:nil];
+        });
 
-          [animator startAnimation];
-        }];
+    [animator addCompletion:^(UIViewAnimatingPosition pos) {
+      [wrapper removeFromSuperview];
+      self->_wrapperView = nil;
+      self.alpha = 1;
+      self->_isExpanded = NO;
+      self->_sourceScreenContainer = nil;
+      self->_targetScreenContainer = nil;
+      resolve(@(YES));
+    }];
+
+    [animator startAnimation];
 
   } else {
     // ══ NO-WRAPPER MODE COLLAPSE ══
@@ -517,39 +531,43 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       _snapshot = snapshot;
     }
 
-    [UIView animateWithDuration:dur * 0.3
-        animations:^{
-          if (targetScreen) {
-            targetScreen.alpha = 0;
-          }
-        }
-        completion:^(BOOL finished) {
-          if (sourceScreen) {
-            sourceScreen.alpha = 1;
-          }
+    // Show source screen underneath before starting collapse
+    if (sourceScreen) {
+      sourceScreen.alpha = 1;
+    }
 
-          UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
-              initWithDuration:dur
-                  dampingRatio:0.85
-                    animations:^{
-                      container.frame = self->_cardFrame;
-                      container.layer.cornerRadius = self->_cardCornerRadius;
-                      snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
-                    }];
+    UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
+        initWithDuration:dur
+            dampingRatio:0.85
+              animations:^{
+                container.frame = self->_cardFrame;
+                container.layer.cornerRadius = self->_cardCornerRadius;
+                snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
+              }];
 
-          [animator addCompletion:^(UIViewAnimatingPosition pos) {
-            [container removeFromSuperview];
-            self->_wrapperView = nil;
-            self->_snapshot = nil;
-            self.alpha = 1;
-            self->_isExpanded = NO;
-            self->_sourceScreenContainer = nil;
-            self->_targetScreenContainer = nil;
-            resolve(@(YES));
-          }];
+    // Fade out target screen concurrently at 15% (mirrors expand's fade-in)
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          [UIView animateWithDuration:dur * 0.5
+              animations:^{
+                if (targetScreen) { targetScreen.alpha = 0; }
+              }
+              completion:nil];
+        });
 
-          [animator startAnimation];
-        }];
+    [animator addCompletion:^(UIViewAnimatingPosition pos) {
+      [container removeFromSuperview];
+      self->_wrapperView = nil;
+      self->_snapshot = nil;
+      self.alpha = 1;
+      self->_isExpanded = NO;
+      self->_sourceScreenContainer = nil;
+      self->_targetScreenContainer = nil;
+      resolve(@(YES));
+    }];
+
+    [animator startAnimation];
   }
 }
 

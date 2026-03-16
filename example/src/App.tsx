@@ -10,6 +10,12 @@ import GalleryScreen from './examples/gallery/GalleryScreen';
 import GalleryDetailScreen from './examples/gallery/GalleryDetailScreen';
 import ProfileScreen from './examples/profile/ProfileScreen';
 import ProfileDetailScreen from './examples/profile/ProfileDetailScreen';
+import ScaleModesScreen from './examples/scalemodes/ScaleModesScreen';
+import ScaleModesDetailScreen from './examples/scalemodes/ScaleModesDetailScreen';
+import MixedScreen from './examples/mixed/MixedScreen';
+import MixedDetailScreen from './examples/mixed/MixedDetailScreen';
+import PerformanceScreen from './examples/performance/PerformanceScreen';
+import PerformanceDetailScreen from './examples/performance/PerformanceDetailScreen';
 
 export type RootStackParamList = {
   ExampleList: undefined;
@@ -21,6 +27,12 @@ export type RootStackParamList = {
   GalleryDetail: { sourceTag: number };
   Profile: undefined;
   ProfileDetail: { sourceTag: number; user: { name: string; handle: string; avatarIndex: number; bio: string; followers: string; following: string; posts: string } };
+  ScaleModes: undefined;
+  ScaleModesDetail: { sourceTag: number; mode: string };
+  Mixed: undefined;
+  MixedDetail: { sourceTag: number; card: { id: string; type: string; title: string; subtitle: string; bg?: string } };
+  Performance: undefined;
+  PerformanceDetail: { sourceTag: number };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -78,6 +90,36 @@ export default function App() {
         <Stack.Screen
           name="ProfileDetail"
           component={ProfileDetailScreen}
+          options={morphModal}
+        />
+        <Stack.Screen
+          name="ScaleModes"
+          component={ScaleModesScreen}
+          options={{ title: 'Scale Modes' }}
+        />
+        <Stack.Screen
+          name="ScaleModesDetail"
+          component={ScaleModesDetailScreen}
+          options={morphModal}
+        />
+        <Stack.Screen
+          name="Mixed"
+          component={MixedScreen}
+          options={{ title: 'Mixed Modes' }}
+        />
+        <Stack.Screen
+          name="MixedDetail"
+          component={MixedDetailScreen}
+          options={morphModal}
+        />
+        <Stack.Screen
+          name="Performance"
+          component={PerformanceScreen}
+          options={{ title: 'Performance' }}
+        />
+        <Stack.Screen
+          name="PerformanceDetail"
+          component={PerformanceDetailScreen}
           options={morphModal}
         />
       </Stack.Navigator>
