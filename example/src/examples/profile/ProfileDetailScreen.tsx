@@ -22,7 +22,7 @@ export default function ProfileDetailScreen({ route, navigation }: Props) {
         <MorphCardTarget
           sourceTag={route.params.sourceTag}
           width={'100%'}
-          height={480}
+          height={280}
           borderRadius={0}
           contentCentered
         />

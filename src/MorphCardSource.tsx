@@ -1,21 +1,16 @@
 import * as React from 'react';
 import {
-  requireNativeComponent,
   Pressable,
-  type ViewProps,
   type ViewStyle,
   View,
   findNodeHandle,
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
+import NativeSourceViewSpec from './specs/NativeMorphCardSource';
 
-let NativeSourceView: React.ComponentType<ViewProps & { duration?: number }>;
+const NativeSourceView = NativeSourceViewSpec ?? View;
 
-try {
-  NativeSourceView = requireNativeComponent('RNCMorphCardSource');
-} catch {
-  NativeSourceView = View;
-}
+export type ScaleMode = 'aspectFill' | 'aspectFit' | 'stretch';
 
 export interface MorphCardSourceProps {
   ref?: React.Ref<any>;
@@ -24,6 +19,8 @@ export interface MorphCardSourceProps {
   height?: number;
   borderRadius?: number;
   backgroundColor?: string;
+  /** How the snapshot scales in no-wrapper mode (no backgroundColor). Default: 'aspectFill' */
+  scaleMode?: ScaleMode;
   onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
 }
@@ -35,6 +32,7 @@ export const MorphCardSource = ({
   height,
   borderRadius,
   backgroundColor,
+  scaleMode,
   onPress,
   ref,
 }: MorphCardSourceProps) => {
@@ -53,7 +51,7 @@ export const MorphCardSource = ({
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} style={style}>
+    <NativeSourceView ref={nativeRef} duration={duration} scaleMode={scaleMode} style={style}>
       {children}
     </NativeSourceView>
   );

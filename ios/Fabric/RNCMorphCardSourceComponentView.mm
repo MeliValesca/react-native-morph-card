@@ -33,7 +33,7 @@ static UIView *findScreenContainer(UIView *view) {
   while (current && current != window) {
     CGRect frameInWindow = [current convertRect:current.bounds toView:nil];
     if (CGRectEqualToRect(frameInWindow, windowBounds)) {
-      result = current; // keep traversing to find the outermost one
+      result = current;
     }
     current = current.superview;
   }
@@ -48,19 +48,41 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
   return alpha > 0.01;
 }
 
+/// Compute the image frame for a given scaleMode within a container of containerSize.
+static CGRect imageFrameForScaleMode(UIViewContentMode mode,
+                                     CGSize imageSize,
+                                     CGSize containerSize) {
+  if (mode == UIViewContentModeScaleAspectFit) {
+    CGFloat scale = MIN(containerSize.width / imageSize.width,
+                        containerSize.height / imageSize.height);
+    CGFloat w = imageSize.width * scale;
+    CGFloat h = imageSize.height * scale;
+    return CGRectMake((containerSize.width - w) / 2,
+                      (containerSize.height - h) / 2, w, h);
+  } else if (mode == UIViewContentModeScaleToFill) {
+    return (CGRect){CGPointZero, containerSize};
+  } else {
+    // AspectFill
+    CGFloat scale = MAX(containerSize.width / imageSize.width,
+                        containerSize.height / imageSize.height);
+    CGFloat w = imageSize.width * scale;
+    CGFloat h = imageSize.height * scale;
+    return CGRectMake((containerSize.width - w) / 2,
+                      (containerSize.height - h) / 2, w, h);
+  }
+}
+
 @implementation RNCMorphCardSourceComponentView {
   CGFloat _duration;
+  UIViewContentMode _scaleMode;
   BOOL _isExpanded;
   BOOL _hasWrapper;
   CGRect _cardFrame;
   CGFloat _cardCornerRadius;
-  CGFloat _cardShadowOpacity;
   __weak UIView *_targetView;
   __weak UIView *_sourceScreenContainer;
   __weak UIView *_targetScreenContainer;
-  // Wrapper mode: wrapper view + content snapshot inside
   UIView *_wrapperView;
-  // No-wrapper mode: single snapshot that scales
   UIImageView *_snapshot;
 }
 
@@ -72,6 +94,7 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
     _duration = 500.0;
+    _scaleMode = UIViewContentModeScaleAspectFill;
     _pendingTargetBorderRadius = -1;
   }
   return self;
@@ -82,6 +105,14 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
   const auto &newProps =
       *std::static_pointer_cast<const RNCMorphCardSourceProps>(props);
   _duration = newProps.duration > 0 ? newProps.duration : 500.0;
+  auto sm = newProps.scaleMode;
+  if (sm == RNCMorphCardSourceScaleMode::AspectFit) {
+    _scaleMode = UIViewContentModeScaleAspectFit;
+  } else if (sm == RNCMorphCardSourceScaleMode::Stretch) {
+    _scaleMode = UIViewContentModeScaleToFill;
+  } else {
+    _scaleMode = UIViewContentModeScaleAspectFill;
+  }
   [super updateProps:props oldProps:oldProps];
 }
 
@@ -129,7 +160,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
   // ── 1. Save card geometry ──
   _cardFrame = [self convertRect:self.bounds toView:nil];
   _cardCornerRadius = self.layer.cornerRadius;
-  _cardShadowOpacity = self.layer.shadowOpacity;
   _hasWrapper = hasVisibleBackgroundColor(self);
 
   // ── 2. Snapshot the card ──
@@ -165,16 +195,12 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
 
   if (_hasWrapper) {
     // ══ WRAPPER MODE ══
-    // Wrapper view (with bg color, shadow, corner radius) expands.
+    // Wrapper view (with bg color, corner radius) expands.
     // Content snapshot stays at original size on top.
     UIView *wrapper = [[UIView alloc] initWithFrame:_cardFrame];
     wrapper.backgroundColor = self.backgroundColor;
     wrapper.layer.cornerRadius = _cardCornerRadius;
     wrapper.clipsToBounds = YES;
-    wrapper.layer.shadowColor = self.layer.shadowColor;
-    wrapper.layer.shadowOpacity = _cardShadowOpacity;
-    wrapper.layer.shadowOffset = self.layer.shadowOffset;
-    wrapper.layer.shadowRadius = self.layer.shadowRadius;
 
     UIImageView *content = [[UIImageView alloc] initWithImage:cardImage];
     content.contentMode = UIViewContentModeTopLeft;
@@ -205,20 +231,17 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
               animations:^{
                 wrapper.frame = targetFrame;
                 wrapper.layer.cornerRadius = targetCornerRadius;
-                wrapper.layer.shadowOpacity = 0;
                 content.frame = CGRectMake(targetCx, targetCy,
                                            contentSize.width,
                                            contentSize.height);
               }];
 
     // Hide the target view itself so it doesn't double-render over the morph overlay.
-    // The rest of the screen content will fade in around it.
     if (targetView) {
       targetView.hidden = YES;
     }
 
     // Start fading in screen content early (at 15% of the animation).
-    // Because the target view is hidden, only surrounding content shows.
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
@@ -235,8 +258,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
     UIColor *wrapperBg = wrapper.backgroundColor;
 
     [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
-      // Transfer the snapshot into the target view with proper styling
-      // Use targetCornerRadius directly (not wrapper.layer.cornerRadius which may be stale)
       if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
         RNCMorphCardTargetComponentView *target = (RNCMorphCardTargetComponentView *)targetView;
         UIView *content = wrapper.subviews.firstObject;
@@ -251,7 +272,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
       }
       if (targetView) { targetView.hidden = NO; }
       self.alpha = 1;
-      // Crossfade: fade out overlay while target screen fades in underneath
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
       [UIView animateWithDuration:0.2
@@ -269,34 +289,43 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
 
   } else {
     // ══ NO-WRAPPER MODE ══
-    // Single snapshot scales with aspect-fill.
+    // Container clips, image view inside respects scaleMode.
+    // We compute image frames ourselves so scaleMode works during animation.
+    UIViewContentMode scaleMode = _scaleMode;
+    CGSize imageSize = cardImage.size;
+
+    UIView *container = [[UIView alloc] initWithFrame:_cardFrame];
+    container.clipsToBounds = YES;
+    container.layer.cornerRadius = _cardCornerRadius;
+
     UIImageView *snapshot = [[UIImageView alloc] initWithImage:cardImage];
-    snapshot.contentMode = UIViewContentModeScaleAspectFill;
     snapshot.clipsToBounds = YES;
-    snapshot.layer.cornerRadius = _cardCornerRadius;
-    snapshot.layer.shadowColor = self.layer.shadowColor;
-    snapshot.layer.shadowOpacity = _cardShadowOpacity;
-    snapshot.layer.shadowOffset = self.layer.shadowOffset;
-    snapshot.layer.shadowRadius = self.layer.shadowRadius;
-    snapshot.frame = _cardFrame;
-    [window addSubview:snapshot];
+    // Start: image fills container exactly (matches source card)
+    snapshot.frame = (CGRect){CGPointZero, _cardFrame.size};
+    [container addSubview:snapshot];
+
+    [window addSubview:container];
     _snapshot = snapshot;
+    _wrapperView = container;
 
     // Hide source AFTER overlay is on screen to avoid flicker
     self.alpha = 0;
 
-    // Hide the target view itself so it doesn't double-render over the morph overlay.
     if (targetView) {
       targetView.hidden = YES;
     }
+
+    // Compute final image frame based on scaleMode
+    CGRect targetImageFrame = imageFrameForScaleMode(
+        scaleMode, imageSize, targetFrame.size);
 
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
             dampingRatio:0.85
               animations:^{
-                snapshot.frame = targetFrame;
-                snapshot.layer.cornerRadius = targetCornerRadius;
-                snapshot.layer.shadowOpacity = 0;
+                container.frame = targetFrame;
+                container.layer.cornerRadius = targetCornerRadius;
+                snapshot.frame = targetImageFrame;
               }];
 
     // Start fading in screen content early (at 15% of the animation).
@@ -314,26 +343,25 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
         });
 
     [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
-      // Transfer the snapshot into the target view with proper styling
       if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
         RNCMorphCardTargetComponentView *target = (RNCMorphCardTargetComponentView *)targetView;
         [target showSnapshot:snapshot.image
-                 contentMode:UIViewContentModeScaleAspectFill
+                 contentMode:scaleMode
                        frame:target.bounds
                 cornerRadius:targetCornerRadius
              backgroundColor:nil];
       }
       if (targetView) { targetView.hidden = NO; }
       self.alpha = 1;
-      // Crossfade: fade out overlay while target screen is visible underneath
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
       [UIView animateWithDuration:0.2
           animations:^{
-            snapshot.alpha = 0;
+            container.alpha = 0;
           }
           completion:^(BOOL finished) {
-            [snapshot removeFromSuperview];
+            [container removeFromSuperview];
+            self->_wrapperView = nil;
             self->_snapshot = nil;
           }];
       resolve(@(YES));
@@ -370,11 +398,8 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
 
   if (_hasWrapper) {
     // ══ WRAPPER MODE COLLAPSE ══
-    // Re-create the wrapper overlay from a snapshot of the source card.
-    // The overlay was removed after expand to let RN views be interactive.
     UIView *wrapper = _wrapperView;
     if (!wrapper) {
-      // Snapshot the original source to get its content image
       self.alpha = 1;
       UIImage *cardImage = [self captureSnapshot];
       self.alpha = 0;
@@ -415,7 +440,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
       _wrapperView = wrapper;
     }
 
-    // Fade out screen content quickly while morph overlay stays visible
     [UIView animateWithDuration:dur * 0.3
         animations:^{
           if (targetScreen) {
@@ -423,7 +447,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           }
         }
         completion:^(BOOL finished) {
-          // Show source screen again for collapse animation
           if (sourceScreen) {
             sourceScreen.alpha = 1;
           }
@@ -436,7 +459,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
                     animations:^{
                       wrapper.frame = self->_cardFrame;
                       wrapper.layer.cornerRadius = self->_cardCornerRadius;
-                      wrapper.layer.shadowOpacity = self->_cardShadowOpacity;
                       if (content) {
                         content.frame = (CGRect){CGPointZero, content.frame.size};
                       }
@@ -457,10 +479,10 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
 
   } else {
     // ══ NO-WRAPPER MODE COLLAPSE ══
+    UIView *container = _wrapperView;
     UIImageView *snapshot = _snapshot;
 
-    if (!snapshot) {
-      // Re-create snapshot at the target position (overlay was removed after expand)
+    if (!container) {
       self.alpha = 1;
       UIImage *cardImage = [self captureSnapshot];
       self.alpha = 0;
@@ -477,16 +499,24 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           th > 0 ? th : _cardFrame.size.height);
       CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
 
+      CGSize imageSize = cardImage.size;
+      CGRect imageFrame = imageFrameForScaleMode(
+          _scaleMode, imageSize, targetFrame.size);
+
+      container = [[UIView alloc] initWithFrame:targetFrame];
+      container.clipsToBounds = YES;
+      container.layer.cornerRadius = targetCornerRadius;
+
       snapshot = [[UIImageView alloc] initWithImage:cardImage];
-      snapshot.contentMode = UIViewContentModeScaleAspectFill;
       snapshot.clipsToBounds = YES;
-      snapshot.layer.cornerRadius = targetCornerRadius;
-      snapshot.frame = targetFrame;
-      [window addSubview:snapshot];
+      snapshot.frame = imageFrame;
+      [container addSubview:snapshot];
+
+      [window addSubview:container];
+      _wrapperView = container;
       _snapshot = snapshot;
     }
 
-    // Fade out screen content quickly while morph overlay stays visible
     [UIView animateWithDuration:dur * 0.3
         animations:^{
           if (targetScreen) {
@@ -494,7 +524,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           }
         }
         completion:^(BOOL finished) {
-          // Show source screen again for collapse animation
           if (sourceScreen) {
             sourceScreen.alpha = 1;
           }
@@ -503,13 +532,14 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
               initWithDuration:dur
                   dampingRatio:0.85
                     animations:^{
-                      snapshot.frame = self->_cardFrame;
-                      snapshot.layer.cornerRadius = self->_cardCornerRadius;
-                      snapshot.layer.shadowOpacity = self->_cardShadowOpacity;
+                      container.frame = self->_cardFrame;
+                      container.layer.cornerRadius = self->_cardCornerRadius;
+                      snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
                     }];
 
           [animator addCompletion:^(UIViewAnimatingPosition pos) {
-            [snapshot removeFromSuperview];
+            [container removeFromSuperview];
+            self->_wrapperView = nil;
             self->_snapshot = nil;
             self.alpha = 1;
             self->_isExpanded = NO;
