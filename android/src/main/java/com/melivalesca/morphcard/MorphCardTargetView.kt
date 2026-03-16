@@ -2,14 +2,16 @@ package com.melivalesca.morphcard
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Outline
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
-import android.view.ViewTreeObserver
-import android.widget.FrameLayout
 import android.widget.ImageView
 import com.facebook.react.views.view.ReactViewGroup
 
@@ -20,7 +22,13 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   var targetBorderRadius: Float = -1f
   var sourceTag: Int = 0
 
-  private var snapshotContainer: FrameLayout? = null
+  // Snapshot drawn via canvas — Fabric can't remove it
+  private var snapshotBitmap: Bitmap? = null
+  private var snapshotFrame: RectF? = null
+  private var snapshotCornerRadius: Float = 0f
+  private var snapshotBgColor: Int? = null
+  private val snapshotPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+  private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
   private val density: Float
     get() = resources.displayMetrics.density
@@ -30,14 +38,9 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     MorphCardViewRegistry.register(this, id)
     Log.d("MorphCard", "TargetView attached: id=$id sourceTag=$sourceTag")
 
-    // Hide the target screen container immediately to prevent flicker.
-    // The expand animation will fade it in at 15%.
     if (sourceTag > 0) {
       val screenContainer = findScreenContainer(this)
       if (screenContainer != null) {
-        // Use INVISIBLE instead of alpha=0 — this completely prevents
-        // the screen from drawing and can't be overridden by
-        // react-native-screens resetting alpha.
         screenContainer.visibility = View.INVISIBLE
         Log.d("MorphCard", "TargetView: set screen INVISIBLE")
       }
@@ -52,6 +55,50 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
     applyBorderRadiusClipping()
+  }
+
+  /**
+   * Draw the snapshot bitmap BEFORE children so React components
+   * (X button, etc.) render on top of it.
+   */
+  override fun dispatchDraw(canvas: Canvas) {
+    val bmp = snapshotBitmap
+    val frame = snapshotFrame
+    if (bmp != null && frame != null) {
+      val radiusPx = snapshotCornerRadius
+
+      // Clip to rounded rect if needed
+      if (radiusPx > 0) {
+        canvas.save()
+        val clipPath = Path()
+        clipPath.addRoundRect(
+          0f, 0f, width.toFloat(), height.toFloat(),
+          radiusPx, radiusPx, Path.Direction.CW
+        )
+        canvas.clipPath(clipPath)
+      }
+
+      // Draw background
+      snapshotBgColor?.let { color ->
+        bgPaint.color = color
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+      }
+
+      // Draw bitmap in the specified frame
+      val src = android.graphics.Rect(0, 0, bmp.width, bmp.height)
+      val dst = android.graphics.Rect(
+        frame.left.toInt(), frame.top.toInt(),
+        frame.right.toInt(), frame.bottom.toInt()
+      )
+      canvas.drawBitmap(bmp, src, dst, snapshotPaint)
+
+      if (radiusPx > 0) {
+        canvas.restore()
+      }
+    }
+
+    // Draw React children on top
+    super.dispatchDraw(canvas)
   }
 
   private fun applyBorderRadiusClipping() {
@@ -91,47 +138,22 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     cornerRadius: Float,
     backgroundColor: Int?
   ) {
-    Log.d("MorphCard", "showSnapshot: viewSize=${width}x${height} frame=$frame cornerR=$cornerRadius bg=$backgroundColor childCount=$childCount")
-    clearSnapshot()
-
-    val container = FrameLayout(context)
-    container.layoutParams = FrameLayout.LayoutParams(width, height)
-    container.clipChildren = true
-    container.clipToPadding = true
-
-    if (cornerRadius > 0) {
-      container.clipToOutline = true
-      container.outlineProvider = object : ViewOutlineProvider() {
-        override fun getOutline(v: View, outline: Outline) {
-          outline.setRoundRect(0, 0, v.width, v.height, cornerRadius)
-        }
-      }
-    }
-
-    if (backgroundColor != null) {
-      container.setBackgroundColor(backgroundColor)
-    }
-
-    val iv = ImageView(context)
-    iv.setImageBitmap(image)
-    iv.scaleType = ImageView.ScaleType.FIT_XY
-    iv.layoutParams = FrameLayout.LayoutParams(
-      frame.width().toInt(), frame.height().toInt()
-    )
-    iv.x = frame.left
-    iv.y = frame.top
-    container.addView(iv)
-
-    addView(container)
-    snapshotContainer = container
-    Log.d("MorphCard", "showSnapshot: added container, new childCount=$childCount")
+    Log.d("MorphCard", "showSnapshot: viewSize=${width}x${height} frame=$frame cornerR=$cornerRadius bg=$backgroundColor")
+    snapshotBitmap = image
+    snapshotFrame = frame
+    snapshotCornerRadius = cornerRadius
+    snapshotBgColor = backgroundColor
+    invalidate()
   }
 
   fun clearSnapshot() {
-    snapshotContainer?.let {
-      Log.d("MorphCard", "clearSnapshot: removing snapshot container")
-      removeView(it)
-      snapshotContainer = null
+    if (snapshotBitmap != null) {
+      Log.d("MorphCard", "clearSnapshot: clearing bitmap")
+      snapshotBitmap = null
+      snapshotFrame = null
+      snapshotCornerRadius = 0f
+      snapshotBgColor = null
+      invalidate()
     }
   }
 }

@@ -31,3 +31,13 @@ allprojects {
         google()
     }
 }
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty("android")) {
+            project.android {
+                compileSdk = 36
+            }
+        }
+    }
+}

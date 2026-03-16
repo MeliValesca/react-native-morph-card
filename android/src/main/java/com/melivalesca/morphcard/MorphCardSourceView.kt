@@ -50,7 +50,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
   private var targetViewRef: View? = null
   private var overlayContainer: FrameLayout? = null
   val hasOverlay: Boolean get() = overlayContainer != null
-  private var transferredSnapshot: FrameLayout? = null
   private var sourceScreenContainerRef: WeakReference<View>? = null
   private var targetScreenContainerRef: WeakReference<View>? = null
   private var screenStackRef: WeakReference<ViewGroup>? = null
@@ -139,15 +138,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     return null
   }
 
-  /**
-   * Find a non-Fabric ancestor (like ScreensCoordinatorLayout) where we can
-   * safely add views without Fabric removing them.
-   */
-  private fun findNonFabricParent(view: View?): ViewGroup? {
-    // The screen container (ScreensCoordinatorLayout) is a CoordinatorLayout,
-    // not managed by Fabric — safe to add children.
-    return findScreenContainer(view) as? ViewGroup
-  }
 
   private fun extractBackgroundColor(): Int? {
     val bg = background ?: return null
@@ -258,10 +248,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       decorView.removeView(stale)
       overlayContainer = null
     }
-    // Clean up transferred snapshot from previous cycle
-    val hadTransferred = transferredSnapshot != null
-    cleanupTransferredSnapshot()
-    if (hadTransferred) Log.d(TAG, "prepareExpand: cleaned up transferred snapshot")
+    // Clear snapshot from previous target view if any
+    (targetViewRef as? MorphCardTargetView)?.clearSnapshot()
 
     targetViewRef = targetView
     cardBgColor = extractBackgroundColor()
@@ -372,6 +360,10 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     }
 
     isExpanded = true
+    // Save target view reference for collapse (prepareExpand may have been called with null)
+    if (targetView != null) {
+      targetViewRef = targetView
+    }
 
     val decorView = getDecorView()
     if (decorView == null) {
@@ -481,11 +473,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
         }
         this@MorphCardSourceView.alpha = 1f
 
-        // Transfer snapshot from DecorView overlay to the target's
-        // non-Fabric parent (ScreensCoordinatorLayout). This allows
-        // absolutely positioned elements (X button) to render on top.
-        transferSnapshotToTarget(decorView, wrapper, targetView, targetLeft, targetTop,
-          targetWidthPx.toInt(), targetHeightPx.toInt(), targetCornerRadiusPx)
+        transferSnapshotToTarget(decorView, wrapper, targetView,
+          targetWidthPx, targetHeightPx, targetCornerRadiusPx, 200L)
 
         promise.resolve(true)
       }
@@ -495,70 +484,62 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
   }
 
   /**
-   * Transfer the overlay snapshot from DecorView to the target screen's
-   * CoordinatorLayout. Like iOS, we add the snapshot first, then fade out
-   * the DecorView overlay over 200ms to prevent any frame gap.
+   * Transfer the snapshot INTO the MorphCardTargetView via showSnapshot(),
+   * then make the target screen VISIBLE and fade out the DecorView overlay.
+   * This allows absolutely positioned elements (X button, etc.) to render
+   * on top of the snapshot, just like iOS.
    */
   private fun transferSnapshotToTarget(
     decorView: ViewGroup,
     overlay: FrameLayout,
     targetView: View?,
-    targetLeft: Float,
-    targetTop: Float,
-    targetWidth: Int,
-    targetHeight: Int,
-    cornerRadius: Float
+    targetWidthPx: Float,
+    targetHeightPx: Float,
+    cornerRadius: Float,
+    fadeDuration: Long = 100
   ) {
-    val targetParent = findNonFabricParent(targetView)
-    if (targetParent == null) {
-      Log.d(TAG, "transferSnapshot: no non-Fabric parent found, keeping overlay")
+    val target = targetView as? MorphCardTargetView
+    if (target == null) {
+      Log.d(TAG, "transferSnapshot: targetView is not MorphCardTargetView, removing overlay")
+      decorView.removeView(overlay)
+      overlayContainer = null
       return
     }
 
-    // Get the target view's position relative to its screen container
-    val parentLoc = IntArray(2)
-    targetParent.getLocationInWindow(parentLoc)
-    val relativeLeft = targetLeft - parentLoc[0]
-    val relativeTop = targetTop - parentLoc[1]
-
-    // Capture the bitmap from the overlay's ImageView (copy, don't move)
-    val snapshotFrame = FrameLayout(context)
-    snapshotFrame.layoutParams = FrameLayout.LayoutParams(targetWidth, targetHeight)
-    snapshotFrame.x = relativeLeft
-    snapshotFrame.y = relativeTop
-    snapshotFrame.clipChildren = overlay.clipChildren
-    snapshotFrame.clipToPadding = overlay.clipToPadding
-    setRoundedCorners(snapshotFrame, cornerRadius)
-
-    val bgColor = cardBgColor
-    if (bgColor != null) {
-      snapshotFrame.setBackgroundColor(bgColor)
-    }
-
-    // Clone the image into the snapshot frame (keep original in overlay for fade)
-    if (overlay.childCount > 0) {
-      val origImg = overlay.getChildAt(0) as? ImageView
-      if (origImg != null) {
-        val cloneImg = ImageView(context)
-        cloneImg.setImageDrawable(origImg.drawable)
-        cloneImg.scaleType = origImg.scaleType
-        cloneImg.layoutParams = FrameLayout.LayoutParams(
-          origImg.layoutParams.width, origImg.layoutParams.height
-        )
-        cloneImg.x = origImg.x
-        cloneImg.y = origImg.y
-        snapshotFrame.addView(cloneImg)
+    // Get the bitmap from the overlay
+    val origImg = if (overlay.childCount > 0) overlay.getChildAt(0) as? ImageView else null
+    val bitmap = if (origImg != null) {
+      // Extract the bitmap from the drawable
+      val drawable = origImg.drawable
+      if (drawable is android.graphics.drawable.BitmapDrawable) {
+        drawable.bitmap
+      } else {
+        // Fallback: render the overlay content to a bitmap
+        val bmp = Bitmap.createBitmap(overlay.width, overlay.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        overlay.draw(canvas)
+        bmp
       }
+    } else null
+
+    if (bitmap != null) {
+      // Compute the image frame within the target view
+      val frame = if (hasWrapper) {
+        val cx = if (pendingContentCentered) (targetWidthPx - cardWidth) / 2f else 0f
+        val cy = if (pendingContentCentered) (targetHeightPx - cardHeight) / 2f
+          else pendingContentOffsetY * density
+        RectF(cx, cy, cx + cardWidth, cy + cardHeight)
+      } else {
+        imageFrameForScaleMode(scaleMode, cardWidth, cardHeight,
+          target.width.toFloat(), target.height.toFloat())
+      }
+
+      target.showSnapshot(bitmap, ImageView.ScaleType.FIT_XY, frame, cornerRadius, cardBgColor)
+      Log.d(TAG, "transferSnapshot: handed snapshot to MorphCardTargetView")
     }
 
-    // Step 1: Add snapshot to target parent (now visible under the overlay)
-    targetParent.addView(snapshotFrame)
-    transferredSnapshot = snapshotFrame
-    Log.d(TAG, "transferSnapshot: added to ${targetParent.javaClass.simpleName} at [$relativeLeft,$relativeTop]")
-
-    // Step 2: Fade out the DecorView overlay over 200ms (like iOS)
     val fadeOut = ValueAnimator.ofFloat(1f, 0f)
-    fadeOut.duration = 200
+    fadeOut.duration = fadeDuration
     fadeOut.addUpdateListener { anim ->
       overlay.alpha = anim.animatedValue as Float
     }
@@ -570,13 +551,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       }
     })
     fadeOut.start()
-  }
-
-  private fun cleanupTransferredSnapshot() {
-    transferredSnapshot?.let { snap ->
-      (snap.parent as? ViewGroup)?.removeView(snap)
-      transferredSnapshot = null
-    }
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -602,7 +576,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
   }
 
   private fun collapseFromTarget(targetView: View?, promise: Promise) {
-    Log.d(TAG, "=== collapseFromTarget START === isExpanded=$isExpanded hasWrapper=$hasWrapper overlayContainer=${overlayContainer != null} transferredSnapshot=${transferredSnapshot != null}")
+    Log.d(TAG, "=== collapseFromTarget START === isExpanded=$isExpanded hasWrapper=$hasWrapper overlayContainer=${overlayContainer != null}")
     if (!isExpanded) {
       promise.resolve(false)
       return
@@ -617,89 +591,57 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     val d = density
     val dur = duration.toLong()
 
-    // Move snapshot back to DecorView overlay for collapse animation
+    // Create DecorView overlay for collapse animation.
+    // Get snapshot from MorphCardTargetView if available, otherwise recapture.
     var wrapper = overlayContainer
     if (wrapper == null) {
-      // Get position from transferred snapshot or target view
-      val snap = transferredSnapshot
-      if (snap != null) {
-        // Convert snapshot's position to window coordinates
-        val snapLoc = IntArray(2)
-        snap.getLocationInWindow(snapLoc)
-        val snapW = snap.width
-        val snapH = snap.height
+      val target = targetView as? MorphCardTargetView
+      val targetLoc = if (targetView != null) getLocationInWindow(targetView) else intArrayOf(cardLeft.toInt(), cardTop.toInt())
+      val twPx = if (pendingTargetWidth > 0) pendingTargetWidth * d else cardWidth
+      val thPx = if (pendingTargetHeight > 0) pendingTargetHeight * d else cardHeight
+      val tbrPx = if (pendingTargetBorderRadius >= 0) pendingTargetBorderRadius * d else cardCornerRadiusPx
 
-        wrapper = FrameLayout(context)
-        wrapper.layoutParams = FrameLayout.LayoutParams(snapW, snapH)
-        wrapper.x = snapLoc[0].toFloat()
-        wrapper.y = snapLoc[1].toFloat()
-        wrapper.clipChildren = true
-        wrapper.clipToPadding = true
-        val tbrPx = if (pendingTargetBorderRadius >= 0) pendingTargetBorderRadius * d else cardCornerRadiusPx
-        setRoundedCorners(wrapper, tbrPx)
+      // Recapture snapshot from source (the image hasn't changed)
+      alpha = 1f
+      val cardImage = captureSnapshot()
+      alpha = 0f
 
-        val bgColor = cardBgColor
-        if (bgColor != null) {
-          wrapper.setBackgroundColor(bgColor)
-        }
+      // Clear the snapshot from the target view
+      target?.clearSnapshot()
 
-        // Move image from transferred snapshot to new overlay
-        if (snap.childCount > 0) {
-          val img = snap.getChildAt(0)
-          snap.removeView(img)
-          wrapper.addView(img)
-        }
+      wrapper = FrameLayout(context)
+      wrapper.layoutParams = FrameLayout.LayoutParams(twPx.toInt(), thPx.toInt())
+      wrapper.x = targetLoc[0].toFloat()
+      wrapper.y = targetLoc[1].toFloat()
+      wrapper.clipChildren = true
+      wrapper.clipToPadding = true
+      setRoundedCorners(wrapper, tbrPx)
 
-        // Clean up transferred snapshot
-        cleanupTransferredSnapshot()
-
-        decorView.addView(wrapper)
-        overlayContainer = wrapper
-      } else {
-        // No overlay and no transferred snapshot — recreate from scratch
-        alpha = 1f
-        val cardImage = captureSnapshot()
-        alpha = 0f
-
-        val targetLoc = if (targetView != null) getLocationInWindow(targetView) else intArrayOf(cardLeft.toInt(), cardTop.toInt())
-        val twPx = if (pendingTargetWidth > 0) pendingTargetWidth * d else cardWidth
-        val thPx = if (pendingTargetHeight > 0) pendingTargetHeight * d else cardHeight
-        val tbrPx = if (pendingTargetBorderRadius >= 0) pendingTargetBorderRadius * d else cardCornerRadiusPx
-
-        wrapper = FrameLayout(context)
-        wrapper.layoutParams = FrameLayout.LayoutParams(twPx.toInt(), thPx.toInt())
-        wrapper.x = targetLoc[0].toFloat()
-        wrapper.y = targetLoc[1].toFloat()
-        wrapper.clipChildren = true
-        wrapper.clipToPadding = true
-        setRoundedCorners(wrapper, tbrPx)
-
-        val bgColor = cardBgColor
-        if (bgColor != null) {
-          wrapper.setBackgroundColor(bgColor)
-        }
-
-        val content = ImageView(context)
-        content.setImageBitmap(cardImage)
-        content.scaleType = ImageView.ScaleType.FIT_XY
-
-        if (hasWrapper) {
-          val cx = if (pendingContentCentered) (twPx - cardWidth) / 2f else 0f
-          val cy = if (pendingContentCentered) (thPx - cardHeight) / 2f else pendingContentOffsetY * d
-          content.layoutParams = FrameLayout.LayoutParams(cardWidth.toInt(), cardHeight.toInt())
-          content.x = cx
-          content.y = cy
-        } else {
-          val imageFrame = imageFrameForScaleMode(scaleMode, cardWidth, cardHeight, twPx, thPx)
-          content.layoutParams = FrameLayout.LayoutParams(imageFrame.width().toInt(), imageFrame.height().toInt())
-          content.x = imageFrame.left
-          content.y = imageFrame.top
-        }
-
-        wrapper.addView(content)
-        decorView.addView(wrapper)
-        overlayContainer = wrapper
+      val bgColor = cardBgColor
+      if (bgColor != null) {
+        wrapper.setBackgroundColor(bgColor)
       }
+
+      val content = ImageView(context)
+      content.setImageBitmap(cardImage)
+      content.scaleType = ImageView.ScaleType.FIT_XY
+
+      if (hasWrapper) {
+        val cx = if (pendingContentCentered) (twPx - cardWidth) / 2f else 0f
+        val cy = if (pendingContentCentered) (thPx - cardHeight) / 2f else pendingContentOffsetY * d
+        content.layoutParams = FrameLayout.LayoutParams(cardWidth.toInt(), cardHeight.toInt())
+        content.x = cx
+        content.y = cy
+      } else {
+        val imageFrame = imageFrameForScaleMode(scaleMode, cardWidth, cardHeight, twPx, thPx)
+        content.layoutParams = FrameLayout.LayoutParams(imageFrame.width().toInt(), imageFrame.height().toInt())
+        content.x = imageFrame.left
+        content.y = imageFrame.top
+      }
+
+      wrapper.addView(content)
+      decorView.addView(wrapper)
+      overlayContainer = wrapper
     }
 
     // Ensure wrapper is valid
@@ -756,11 +698,11 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       }
     }
 
-    // Crossfade: fade out target screen starting at 10%, over remaining 90%
+    // Crossfade: fade out target screen starting at 10%, over 65% of duration
     if (targetScreen != null && targetScreen !== sourceScreen) {
       mainHandler.postDelayed({
         val fadeAnimator = ValueAnimator.ofFloat(1f, 0f)
-        fadeAnimator.duration = (dur * 0.9f).toLong()
+        fadeAnimator.duration = (dur * 0.65f).toLong()
         fadeAnimator.addUpdateListener { a ->
           targetScreen.alpha = a.animatedValue as Float
         }
@@ -777,7 +719,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       override fun onAnimationEnd(animation: android.animation.Animator) {
         decorView.removeView(wrapper)
         overlayContainer = null
-        cleanupTransferredSnapshot()
         removeHierarchyListener()
         this@MorphCardSourceView.alpha = 1f
         isExpanded = false

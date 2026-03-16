@@ -23,7 +23,7 @@ export default function MusicDetailScreen({ route, navigation }: Props) {
           sourceTag={route.params.sourceTag}
           width={300}
           height={300}
-          borderRadius={12}
+          borderRadius={16}
         />
 
         <Text
