@@ -211,13 +211,20 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
                                            contentSize.height);
               }];
 
-    // Start fading in screen content at 60% of the animation
+    // Hide the target view itself so it doesn't double-render over the morph overlay.
+    // The rest of the screen content will fade in around it.
+    if (targetView) {
+      targetView.hidden = YES;
+    }
+
+    // Start fading in screen content early (at 15% of the animation).
+    // Because the target view is hidden, only surrounding content shows.
     dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.6 * NSEC_PER_SEC)),
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
           UIView *ts = self->_targetScreenContainer;
           if (ts) {
-            [UIView animateWithDuration:dur * 0.4
+            [UIView animateWithDuration:dur * 0.5
                 animations:^{
                   ts.alpha = 1;
                 }
@@ -225,7 +232,36 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           }
         });
 
+    UIColor *wrapperBg = wrapper.backgroundColor;
+
     [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
+      // Transfer the snapshot into the target view with proper styling
+      // Use targetCornerRadius directly (not wrapper.layer.cornerRadius which may be stale)
+      if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
+        RNCMorphCardTargetComponentView *target = (RNCMorphCardTargetComponentView *)targetView;
+        UIView *content = wrapper.subviews.firstObject;
+        if ([content isKindOfClass:[UIImageView class]]) {
+          CGRect contentFrame = content.frame;
+          [target showSnapshot:((UIImageView *)content).image
+                   contentMode:UIViewContentModeTopLeft
+                         frame:contentFrame
+                  cornerRadius:targetCornerRadius
+               backgroundColor:wrapperBg];
+        }
+      }
+      if (targetView) { targetView.hidden = NO; }
+      self.alpha = 1;
+      // Crossfade: fade out overlay while target screen fades in underneath
+      UIView *ts = self->_targetScreenContainer;
+      if (ts) { ts.alpha = 1; }
+      [UIView animateWithDuration:0.2
+          animations:^{
+            wrapper.alpha = 0;
+          }
+          completion:^(BOOL finished) {
+            [wrapper removeFromSuperview];
+            self->_wrapperView = nil;
+          }];
       resolve(@(YES));
     }];
 
@@ -249,6 +285,11 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
     // Hide source AFTER overlay is on screen to avoid flicker
     self.alpha = 0;
 
+    // Hide the target view itself so it doesn't double-render over the morph overlay.
+    if (targetView) {
+      targetView.hidden = YES;
+    }
+
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
             dampingRatio:0.85
@@ -258,13 +299,13 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
                 snapshot.layer.shadowOpacity = 0;
               }];
 
-    // Start fading in screen content at 60% of the animation
+    // Start fading in screen content early (at 15% of the animation).
     dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.6 * NSEC_PER_SEC)),
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
           UIView *ts = self->_targetScreenContainer;
           if (ts) {
-            [UIView animateWithDuration:dur * 0.4
+            [UIView animateWithDuration:dur * 0.5
                 animations:^{
                   ts.alpha = 1;
                 }
@@ -273,6 +314,28 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
         });
 
     [animator addCompletion:^(UIViewAnimatingPosition finalPosition) {
+      // Transfer the snapshot into the target view with proper styling
+      if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
+        RNCMorphCardTargetComponentView *target = (RNCMorphCardTargetComponentView *)targetView;
+        [target showSnapshot:snapshot.image
+                 contentMode:UIViewContentModeScaleAspectFill
+                       frame:target.bounds
+                cornerRadius:targetCornerRadius
+             backgroundColor:nil];
+      }
+      if (targetView) { targetView.hidden = NO; }
+      self.alpha = 1;
+      // Crossfade: fade out overlay while target screen is visible underneath
+      UIView *ts = self->_targetScreenContainer;
+      if (ts) { ts.alpha = 1; }
+      [UIView animateWithDuration:0.2
+          animations:^{
+            snapshot.alpha = 0;
+          }
+          completion:^(BOOL finished) {
+            [snapshot removeFromSuperview];
+            self->_snapshot = nil;
+          }];
       resolve(@(YES));
     }];
 
@@ -298,11 +361,62 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
   UIView *targetScreen = _targetScreenContainer;
   UIView *sourceScreen = _sourceScreenContainer;
 
-  if (_hasWrapper && _wrapperView) {
-    // ══ WRAPPER MODE COLLAPSE ══
-    UIView *wrapper = _wrapperView;
+  // Clear the snapshot from the target view before re-creating the overlay
+  if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
+    [(RNCMorphCardTargetComponentView *)targetView clearSnapshot];
+  }
 
-    [UIView animateWithDuration:0.2
+  NSTimeInterval dur = _duration / 1000.0;
+
+  if (_hasWrapper) {
+    // ══ WRAPPER MODE COLLAPSE ══
+    // Re-create the wrapper overlay from a snapshot of the source card.
+    // The overlay was removed after expand to let RN views be interactive.
+    UIView *wrapper = _wrapperView;
+    if (!wrapper) {
+      // Snapshot the original source to get its content image
+      self.alpha = 1;
+      UIImage *cardImage = [self captureSnapshot];
+      self.alpha = 0;
+
+      CGPoint targetOrigin = targetView
+          ? [targetView convertPoint:CGPointZero toView:nil]
+          : _cardFrame.origin;
+      CGFloat tw = self.pendingTargetWidth;
+      CGFloat th = self.pendingTargetHeight;
+      CGFloat tbr = self.pendingTargetBorderRadius;
+      CGRect targetFrame = CGRectMake(
+          targetOrigin.x, targetOrigin.y,
+          tw > 0 ? tw : _cardFrame.size.width,
+          th > 0 ? th : _cardFrame.size.height);
+      CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+
+      CGFloat contentOffsetY = self.pendingContentOffsetY;
+      BOOL contentCentered = self.pendingContentCentered;
+      CGSize contentSize = _cardFrame.size;
+      CGFloat cx = contentCentered
+          ? (targetFrame.size.width - contentSize.width) / 2.0 : 0;
+      CGFloat cy = contentCentered
+          ? (targetFrame.size.height - contentSize.height) / 2.0
+          : contentOffsetY;
+
+      wrapper = [[UIView alloc] initWithFrame:targetFrame];
+      wrapper.backgroundColor = self.backgroundColor;
+      wrapper.layer.cornerRadius = targetCornerRadius;
+      wrapper.clipsToBounds = YES;
+
+      UIImageView *content = [[UIImageView alloc] initWithImage:cardImage];
+      content.contentMode = UIViewContentModeTopLeft;
+      content.clipsToBounds = YES;
+      content.frame = CGRectMake(cx, cy, contentSize.width, contentSize.height);
+      [wrapper addSubview:content];
+
+      [window addSubview:wrapper];
+      _wrapperView = wrapper;
+    }
+
+    // Fade out screen content quickly while morph overlay stays visible
+    [UIView animateWithDuration:dur * 0.3
         animations:^{
           if (targetScreen) {
             targetScreen.alpha = 0;
@@ -313,8 +427,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           if (sourceScreen) {
             sourceScreen.alpha = 1;
           }
-
-          NSTimeInterval dur = self->_duration / 1000.0;
 
           UIView *content = wrapper.subviews.firstObject;
 
@@ -348,19 +460,34 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
     UIImageView *snapshot = _snapshot;
 
     if (!snapshot) {
-      // Fallback: re-snapshot
+      // Re-create snapshot at the target position (overlay was removed after expand)
       self.alpha = 1;
       UIImage *cardImage = [self captureSnapshot];
       self.alpha = 0;
 
+      CGPoint targetOrigin = targetView
+          ? [targetView convertPoint:CGPointZero toView:nil]
+          : _cardFrame.origin;
+      CGFloat tw = self.pendingTargetWidth;
+      CGFloat th = self.pendingTargetHeight;
+      CGFloat tbr = self.pendingTargetBorderRadius;
+      CGRect targetFrame = CGRectMake(
+          targetOrigin.x, targetOrigin.y,
+          tw > 0 ? tw : _cardFrame.size.width,
+          th > 0 ? th : _cardFrame.size.height);
+      CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+
       snapshot = [[UIImageView alloc] initWithImage:cardImage];
       snapshot.contentMode = UIViewContentModeScaleAspectFill;
       snapshot.clipsToBounds = YES;
-      snapshot.frame = _cardFrame;
+      snapshot.layer.cornerRadius = targetCornerRadius;
+      snapshot.frame = targetFrame;
       [window addSubview:snapshot];
+      _snapshot = snapshot;
     }
 
-    [UIView animateWithDuration:0.2
+    // Fade out screen content quickly while morph overlay stays visible
+    [UIView animateWithDuration:dur * 0.3
         animations:^{
           if (targetScreen) {
             targetScreen.alpha = 0;
@@ -371,8 +498,6 @@ static BOOL hasVisibleBackgroundColor(UIView *view) {
           if (sourceScreen) {
             sourceScreen.alpha = 1;
           }
-
-          NSTimeInterval dur = self->_duration / 1000.0;
 
           UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
               initWithDuration:dur

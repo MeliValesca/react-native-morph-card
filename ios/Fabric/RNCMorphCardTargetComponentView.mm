@@ -7,7 +7,10 @@
 
 using namespace facebook::react;
 
-@implementation RNCMorphCardTargetComponentView
+@implementation RNCMorphCardTargetComponentView {
+  UIView *_snapshotContainer; // our own view — Fabric can't reset its styles
+  UIImageView *_snapshotView;
+}
 
 + (ComponentDescriptorProvider)componentDescriptorProvider {
   return concreteComponentDescriptorProvider<
@@ -48,6 +51,45 @@ using namespace facebook::react;
   } else {
     [[RNCMorphCardViewRegistry shared] unregisterViewWithTag:self.tag];
   }
+}
+
+- (void)showSnapshot:(UIImage *)image
+         contentMode:(UIViewContentMode)mode
+               frame:(CGRect)frame
+        cornerRadius:(CGFloat)cornerRadius
+     backgroundColor:(UIColor *)bgColor {
+  [self clearSnapshot];
+  // Use a dedicated container subview for all snapshot styling.
+  // Fabric manages self's properties and can reset them at any time,
+  // but it cannot touch our own subview's properties.
+  UIView *container = [[UIView alloc] initWithFrame:self.bounds];
+  container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  container.clipsToBounds = YES;
+  container.layer.cornerRadius = cornerRadius;
+  if (bgColor) { container.backgroundColor = bgColor; }
+
+  UIImageView *iv = [[UIImageView alloc] initWithImage:image];
+  iv.contentMode = mode;
+  iv.clipsToBounds = YES;
+  iv.frame = frame;
+  [container addSubview:iv];
+
+  [self addSubview:container];
+  _snapshotContainer = container;
+  _snapshotView = iv;
+}
+
+- (void)clearSnapshot {
+  if (_snapshotContainer) {
+    [_snapshotContainer removeFromSuperview];
+    _snapshotContainer = nil;
+    _snapshotView = nil;
+  }
+}
+
+- (void)prepareForRecycle {
+  [super prepareForRecycle];
+  [self clearSnapshot];
 }
 
 Class<RCTComponentViewProtocol> RNCMorphCardTargetCls(void) {

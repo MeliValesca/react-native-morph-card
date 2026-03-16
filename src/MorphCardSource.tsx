@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   requireNativeComponent,
+  Pressable,
   type ViewProps,
   type ViewStyle,
   View,
@@ -8,9 +9,7 @@ import {
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
 
-let NativeSourceView: React.ComponentType<
-  ViewProps & { duration?: number }
->;
+let NativeSourceView: React.ComponentType<ViewProps & { duration?: number }>;
 
 try {
   NativeSourceView = requireNativeComponent('RNCMorphCardSource');
@@ -25,26 +24,18 @@ export interface MorphCardSourceProps {
   height?: number;
   borderRadius?: number;
   backgroundColor?: string;
-  shadowColor?: string;
-  shadowOffset?: { width: number; height: number };
-  shadowOpacity?: number;
-  shadowRadius?: number;
-  elevation?: number;
+  onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
 }
 
 export const MorphCardSource = ({
   children,
-  duration = 500,
+  duration = 300,
   width,
   height,
   borderRadius,
   backgroundColor,
-  shadowColor,
-  shadowOffset,
-  shadowOpacity,
-  shadowRadius,
-  elevation,
+  onPress,
   ref,
 }: MorphCardSourceProps) => {
   const nativeRef = React.useRef<any>(null);
@@ -55,21 +46,23 @@ export const MorphCardSource = ({
   if (height != null) style.height = height;
   if (borderRadius != null) style.borderRadius = borderRadius;
   if (backgroundColor != null) style.backgroundColor = backgroundColor;
-  if (shadowColor != null) style.shadowColor = shadowColor;
-  if (shadowOffset != null) style.shadowOffset = shadowOffset;
-  if (shadowOpacity != null) style.shadowOpacity = shadowOpacity;
-  if (shadowRadius != null) style.shadowRadius = shadowRadius;
-  if (elevation != null) style.elevation = elevation;
+  const handlePress = React.useCallback(() => {
+    if (!onPress) return;
+    const tag = findNodeHandle(nativeRef.current);
+    if (tag != null) onPress(tag);
+  }, [onPress]);
 
-  return (
-    <NativeSourceView
-      ref={nativeRef}
-      duration={duration}
-      style={style}
-    >
+  const content = (
+    <NativeSourceView ref={nativeRef} duration={duration} style={style}>
       {children}
     </NativeSourceView>
   );
+
+  if (onPress) {
+    return <Pressable onPress={handlePress}>{content}</Pressable>;
+  }
+
+  return content;
 };
 
 /**
