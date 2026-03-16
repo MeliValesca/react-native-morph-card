@@ -22,10 +22,10 @@ class MorphCardPackage : BaseReactPackage() {
           ReactModuleInfo(
             MorphCardModule.NAME,
             MorphCardModule.NAME,
-            false,
-            false,
-            false,
-            true,
+            false, // canOverrideExistingModule
+            false, // needsEagerInit
+            false, // isCxxModule
+            true,  // isTurboModule
           )
       )
     }

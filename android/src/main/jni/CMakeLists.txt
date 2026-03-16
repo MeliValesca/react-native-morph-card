@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.13)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
-project(morphcard)
+set(LIB_LITERAL morphcard)
+set(LIB_TARGET_NAME react_codegen_${LIB_LITERAL})
 
-set(CMAKE_VERBOSE_MAKEFILE on)
+set(LIB_ANDROID_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
+set(LIB_COMMON_DIR ${LIB_ANDROID_DIR}/../common/cpp)
+set(LIB_COMMON_COMPONENTS_DIR ${LIB_COMMON_DIR}/react/renderer/components/${LIB_LITERAL})
+set(LIB_ANDROID_GENERATED_JNI_DIR ${LIB_ANDROID_DIR}/build/generated/source/codegen/jni)
+set(LIB_ANDROID_GENERATED_COMPONENTS_DIR ${LIB_ANDROID_GENERATED_JNI_DIR}/react/renderer/components/${LIB_LITERAL})
 
 add_compile_options(
   -fexceptions
@@ -12,36 +18,45 @@ add_compile_options(
   -Wpedantic
 )
 
-file(GLOB morphcard_SRC CONFIGURE_DEPENDS ../../../../common/cpp/react/renderer/components/morphcard/*.cpp)
+file(GLOB LIB_CUSTOM_SRCS CONFIGURE_DEPENDS *.cpp ${LIB_COMMON_COMPONENTS_DIR}/*.cpp)
+file(GLOB LIB_CODEGEN_SRCS CONFIGURE_DEPENDS
+  ${LIB_ANDROID_GENERATED_JNI_DIR}/*.cpp
+  ${LIB_ANDROID_GENERATED_COMPONENTS_DIR}/*.cpp
+)
 
 add_library(
-  react_codegen_morphcard
+  ${LIB_TARGET_NAME}
   SHARED
-  ${morphcard_SRC}
+  ${LIB_CUSTOM_SRCS}
+  ${LIB_CODEGEN_SRCS}
 )
 
-target_include_directories(react_codegen_morphcard PUBLIC ../../../../common/cpp)
-
-find_package(fbjni REQUIRED CONFIG)
-find_package(ReactAndroid REQUIRED CONFIG)
+target_include_directories(
+  ${LIB_TARGET_NAME}
+  PUBLIC
+  .
+  ${LIB_COMMON_DIR}
+  ${LIB_ANDROID_GENERATED_JNI_DIR}
+  ${LIB_ANDROID_GENERATED_COMPONENTS_DIR}
+)
 
 target_link_libraries(
-  react_codegen_morphcard
-  fbjni::fbjni
-  ReactAndroid::fabricjni
-  ReactAndroid::folly_runtime
-  ReactAndroid::glog
+  ${LIB_TARGET_NAME}
+  ReactAndroid::reactnative
   ReactAndroid::jsi
-  ReactAndroid::mapbufferjni
-  ReactAndroid::react_codegen_rncore
-  ReactAndroid::react_debug
-  ReactAndroid::react_nativemodule_core
-  ReactAndroid::react_render_componentregistry
-  ReactAndroid::react_render_core
-  ReactAndroid::react_render_debug
-  ReactAndroid::react_render_graphics
-  ReactAndroid::react_render_mapbuffer
-  ReactAndroid::react_utils
-  ReactAndroid::rrc_view
-  ReactAndroid::yoga
+  fbjni::fbjni
 )
+
+if(ReactAndroid_VERSION_MINOR GREATER_EQUAL 80)
+  target_compile_reactnative_options(${LIB_TARGET_NAME} PRIVATE)
+else()
+  target_compile_options(
+    ${LIB_TARGET_NAME}
+    PRIVATE
+    -DLOG_TAG=\"ReactNative\"
+    -fexceptions
+    -frtti
+    -std=c++20
+    -Wall
+  )
+endif()

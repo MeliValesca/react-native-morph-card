@@ -12,6 +12,7 @@ export interface NativeMorphCardSourceProps extends ViewProps {
   onDismissComplete?: DirectEventHandler<{}>;
   duration?: Double;
   scaleMode?: WithDefault<'aspectFill' | 'aspectFit' | 'stretch', 'aspectFill'>;
+  cardBorderRadius?: Double;
 }
 
 export default codegenNativeComponent<NativeMorphCardSourceProps>(

@@ -7,7 +7,6 @@ module.exports = {
           'RNCMorphCardSourceComponentDescriptor',
           'RNCMorphCardTargetComponentDescriptor',
         ],
-        cmakeListsPath: '../src/main/jni/CMakeLists.txt',
       },
     },
   },

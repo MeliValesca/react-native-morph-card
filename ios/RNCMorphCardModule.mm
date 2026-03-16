@@ -9,6 +9,10 @@
 
 RCT_EXPORT_MODULE()
 
+// No-op on iOS — Android uses this to create the overlay before navigation
+RCT_EXPORT_METHOD(prepareExpand : (double)sourceTag) {
+}
+
 RCT_EXPORT_METHOD(setTargetConfig
                   : (double)sourceTag targetWidth
                   : (double)targetWidth targetHeight

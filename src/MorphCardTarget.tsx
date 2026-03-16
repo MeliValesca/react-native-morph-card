@@ -13,6 +13,7 @@ import NativeMorphCardModule from './specs/NativeMorphCardModule';
 
 let NativeTargetView: React.ComponentType<
   ViewProps & {
+    sourceTag?: number;
     targetWidth?: number;
     targetHeight?: number;
     targetBorderRadius?: number;
@@ -114,6 +115,7 @@ export const MorphCardTarget = ({
   return (
     <NativeTargetView
       ref={nativeRef}
+      sourceTag={sourceTag}
       targetWidth={0}
       targetHeight={0}
       targetBorderRadius={borderRadius != null ? borderRadius : -1}

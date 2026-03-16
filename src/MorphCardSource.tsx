@@ -51,11 +51,15 @@ export const MorphCardSource = ({
   const handlePress = React.useCallback(() => {
     if (!onPress) return;
     const tag = findNodeHandle(nativeRef.current);
-    if (tag != null) onPress(tag);
+    if (tag != null) {
+      // Create overlay immediately BEFORE navigation to prevent target screen flash
+      NativeMorphCardModule.prepareExpand(tag);
+      onPress(tag);
+    }
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} scaleMode={scaleMode} style={style}>
+    <NativeSourceView ref={nativeRef} duration={duration} scaleMode={scaleMode} cardBorderRadius={borderRadius} style={style}>
       {children}
     </NativeSourceView>
   );

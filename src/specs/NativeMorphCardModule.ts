@@ -2,6 +2,7 @@ import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
 export interface Spec extends TurboModule {
+  prepareExpand(sourceTag: number): void;
   expand(sourceTag: number, targetTag: number): Promise<boolean>;
   setTargetConfig(
     sourceTag: number,
