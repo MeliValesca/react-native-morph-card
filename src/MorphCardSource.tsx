@@ -52,9 +52,11 @@ export const MorphCardSource = ({
     if (!onPress) return;
     const tag = findNodeHandle(nativeRef.current);
     if (tag != null) {
-      // Create overlay immediately BEFORE navigation to prevent target screen flash
+      // Create overlay immediately BEFORE navigation to prevent target screen flash.
+      // Delay navigation by one frame so the overlay is drawn before the modal screen
+      // is added — prevents the target screen from flashing on Android.
       NativeMorphCardModule.prepareExpand(tag);
-      onPress(tag);
+      requestAnimationFrame(() => onPress(tag));
     }
   }, [onPress]);
 

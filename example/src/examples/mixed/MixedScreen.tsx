@@ -45,7 +45,14 @@ export default function MixedScreen() {
       style={{ flex: 1, backgroundColor: '#f2f2f7' }}
       contentContainerStyle={{ padding: 20 }}
     >
-      <Text style={{ fontSize: 13, fontWeight: '600', color: '#888', marginBottom: 16 }}>
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: '600',
+          color: '#888',
+          marginBottom: 16,
+        }}
+      >
         WRAPPER AND NO-WRAPPER CARDS IN THE SAME LIST
       </Text>
 
@@ -55,22 +62,41 @@ export default function MixedScreen() {
             backgroundColor={card.type === 'wrapper' ? card.bg : undefined}
             borderRadius={card.id === 'nowrap-2' ? 100 : 16}
             height={card.id === 'nowrap-2' ? 200 : 180}
-            duration={400}
+            duration={1000}
             onPress={(sourceTag: number) =>
               navigation.navigate('MixedDetail', { sourceTag, card })
             }
           >
             <Image
-              source={card.type === 'wrapper' ? landscapes[index] : avatars[index % avatars.length]}
+              source={
+                card.type === 'wrapper'
+                  ? landscapes[index]
+                  : avatars[index % avatars.length]
+              }
               resizeMode="cover"
               style={{ width: '100%', height: '100%' }}
             />
             {card.type === 'wrapper' && (
-              <View style={{ position: 'absolute', bottom: 16, left: 16, right: 16 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}>
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 18, fontWeight: '700', color: '#fff' }}
+                >
                   {card.title}
                 </Text>
-                <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: 'rgba(255,255,255,0.7)',
+                    marginTop: 2,
+                  }}
+                >
                   {card.subtitle}
                 </Text>
               </View>
@@ -78,7 +104,9 @@ export default function MixedScreen() {
           </MorphCardSource>
           {card.type === 'nowrap' && (
             <View style={{ marginTop: 8 }}>
-              <Text style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a' }}>
+              <Text
+                style={{ fontSize: 15, fontWeight: '600', color: '#1a1a1a' }}
+              >
                 {card.title}
               </Text>
               <Text style={{ fontSize: 12, color: '#888', marginTop: 2 }}>

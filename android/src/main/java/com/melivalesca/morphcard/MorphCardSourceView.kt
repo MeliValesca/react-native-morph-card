@@ -7,6 +7,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.RectF
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.ColorDrawable
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +18,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -54,6 +59,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
   private var targetScreenContainerRef: WeakReference<View>? = null
   private var screenStackRef: WeakReference<ViewGroup>? = null
   private var hierarchyListener: ViewGroup.OnHierarchyChangeListener? = null
+  private var preDrawListener: ViewTreeObserver.OnPreDrawListener? = null
 
   // Spring-like interpolator (approximates iOS dampingRatio:0.85)
   private val springInterpolator = PathInterpolator(0.25f, 1.0f, 0.5f, 1.0f)
@@ -94,19 +100,124 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
   // ── Snapshot ──
 
+  /**
+   * Capture a snapshot of the source card's children WITHOUT border radius clipping.
+   * Like iOS, we want the raw content (e.g. the full rectangular image), not what's
+   * visually clipped on screen. The border radius is applied separately during animation.
+   *
+   * This disables both Android's clipToOutline AND Fresco's RoundingParams (used by
+   * React Native's Image component) to capture the full rectangular content.
+   */
   private fun captureSnapshot(): Bitmap {
     val w = width
     val h = height
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
+
+    // Track Fresco views to restore rounding after capture
+    data class FrescoState(val view: View, val hierarchy: Any, val roundingParams: Any)
+    val frescoStates = mutableListOf<FrescoState>()
+    // Track views whose clipToOutline was disabled
+    val clippedViews = mutableListOf<View>()
+
+    // Map of Fresco views to their hierarchy (for drawing drawable directly)
+    val frescoViews = mutableMapOf<View, Any>()
+
+    fun prepareView(view: View) {
+      // Disable outline clipping
+      if (view.clipToOutline) {
+        clippedViews.add(view)
+        view.clipToOutline = false
+      }
+
+      // Detect Fresco DraweeView and disable rounding
+      try {
+        val getHierarchy = view.javaClass.getMethod("getHierarchy")
+        val hierarchy = getHierarchy.invoke(view)
+        if (hierarchy != null) {
+          val getRounding = hierarchy.javaClass.getMethod("getRoundingParams")
+          val rounding = getRounding.invoke(hierarchy)
+          if (rounding != null) {
+            val roundingClass = Class.forName("com.facebook.drawee.generic.RoundingParams")
+            val setRounding = hierarchy.javaClass.getMethod("setRoundingParams", roundingClass)
+            setRounding.invoke(hierarchy, null)
+            frescoStates.add(FrescoState(view, hierarchy, rounding))
+            frescoViews[view] = hierarchy
+            Log.d(TAG, "captureSnapshot: disabled Fresco rounding on ${view.width}x${view.height}")
+          }
+        }
+      } catch (_: Exception) {}
+
+      if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+          prepareView(view.getChildAt(i))
+        }
+      }
+    }
+
+    for (i in 0 until childCount) {
+      prepareView(getChildAt(i))
+    }
+
+    // Draw children. For Fresco views, draw the top-level drawable directly
+    // (since the internal drawable is rebuilt when roundingParams changes).
+    fun drawView(view: View, c: Canvas) {
+      val hierarchy = frescoViews[view]
+      if (hierarchy != null) {
+        try {
+          val getTopDrawable = hierarchy.javaClass.getMethod("getTopLevelDrawable")
+          val drawable = getTopDrawable.invoke(hierarchy) as? android.graphics.drawable.Drawable
+          if (drawable != null) {
+            drawable.setBounds(0, 0, view.width, view.height)
+            drawable.invalidateSelf()
+            drawable.draw(c)
+            Log.d(TAG, "captureSnapshot: drew Fresco drawable directly ${view.width}x${view.height}")
+            return
+          }
+        } catch (_: Exception) {}
+      }
+
+      if (view is ViewGroup) {
+        // Draw background
+        view.background?.let { bg ->
+          bg.setBounds(0, 0, view.width, view.height)
+          bg.draw(c)
+        }
+        for (i in 0 until view.childCount) {
+          val child = view.getChildAt(i)
+          if (child.visibility != VISIBLE) continue
+          c.save()
+          c.translate(child.left.toFloat(), child.top.toFloat())
+          drawView(child, c)
+          c.restore()
+        }
+      } else {
+        view.draw(c)
+      }
+    }
+
     for (i in 0 until childCount) {
       val child = getChildAt(i)
       if (child.visibility != VISIBLE) continue
       canvas.save()
       canvas.translate(child.left.toFloat(), child.top.toFloat())
-      child.draw(canvas)
+      drawView(child, canvas)
       canvas.restore()
     }
+
+    // Restore clipToOutline
+    for (view in clippedViews) {
+      view.clipToOutline = true
+    }
+    // Restore Fresco rounding params
+    for (state in frescoStates) {
+      try {
+        val roundingClass = Class.forName("com.facebook.drawee.generic.RoundingParams")
+        val setRounding = state.hierarchy.javaClass.getMethod("setRoundingParams", roundingClass)
+        setRounding.invoke(state.hierarchy, state.roundingParams)
+      } catch (_: Exception) {}
+    }
+
     return bitmap
   }
 
@@ -222,10 +333,62 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     }
   }
 
+  /**
+   * Walk the view tree and hide any screen container that isn't already known.
+   * This catches modal screens added to separate ScreenStacks (e.g. transparentModal).
+   */
+  private fun hideNewScreenContainers(root: ViewGroup, knownScreens: Set<View>): Int {
+    var count = 0
+    fun walk(group: ViewGroup) {
+      val name = group.javaClass.name
+      if (name.contains("ScreenStack") || name.contains("ScreenContainer")) {
+        for (i in 0 until group.childCount) {
+          val child = group.getChildAt(i)
+          if (!knownScreens.contains(child) && child.visibility == View.VISIBLE) {
+            child.visibility = View.INVISIBLE
+            count++
+            Log.d(TAG, "preDraw: hid new screen ${child.javaClass.simpleName} in ${group.javaClass.simpleName}")
+          }
+        }
+      }
+      for (i in 0 until group.childCount) {
+        val child = group.getChildAt(i)
+        if (child is ViewGroup) walk(child)
+      }
+    }
+    walk(root)
+    return count
+  }
+
+  /**
+   * Collect all current children of ScreenStack/ScreenContainer views.
+   */
+  private fun collectExistingScreens(root: ViewGroup): Set<View> {
+    val screens = mutableSetOf<View>()
+    fun walk(group: ViewGroup) {
+      val name = group.javaClass.name
+      if (name.contains("ScreenStack") || name.contains("ScreenContainer")) {
+        for (i in 0 until group.childCount) {
+          screens.add(group.getChildAt(i))
+        }
+      }
+      for (i in 0 until group.childCount) {
+        val child = group.getChildAt(i)
+        if (child is ViewGroup) walk(child)
+      }
+    }
+    walk(root)
+    return screens
+  }
+
   private fun removeHierarchyListener() {
     screenStackRef?.get()?.setOnHierarchyChangeListener(null)
     screenStackRef = null
     hierarchyListener = null
+    preDrawListener?.let { listener ->
+      getDecorView()?.viewTreeObserver?.removeOnPreDrawListener(listener)
+      preDrawListener = null
+    }
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -286,7 +449,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
         override fun onChildViewAdded(parent: View?, child: View?) {
           if (child != null && child !== sourceScreen) {
             child.visibility = View.INVISIBLE
-            Log.d(TAG, "prepareExpand: intercepted new screen, set INVISIBLE")
+            Log.d(TAG, "prepareExpand: hierarchy intercepted new screen, set INVISIBLE")
           }
         }
         override fun onChildViewRemoved(parent: View?, child: View?) {}
@@ -296,10 +459,69 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       hierarchyListener = listener
     }
 
+    // Also install a pre-draw listener on the DecorView to catch modal screens
+    // that are added to a different ScreenStack (e.g. transparentModal).
+    // This fires before every frame draw, so we can hide screens before they render.
+    val knownScreens = collectExistingScreens(decorView)
+    Log.d(TAG, "prepareExpand: tracking ${knownScreens.size} existing screens")
+    val pdListener = ViewTreeObserver.OnPreDrawListener {
+      val hidCount = hideNewScreenContainers(decorView, knownScreens)
+      if (hidCount > 0) {
+        // Cancel this draw frame — the new screen was visible and we just hid it.
+        // Returning false prevents this frame from rendering, so the screen
+        // is never shown. The next frame will re-check and proceed.
+        Log.d(TAG, "preDraw: cancelled draw frame (hid $hidCount screens)")
+        false
+      } else {
+        true
+      }
+    }
+    decorView.viewTreeObserver.addOnPreDrawListener(pdListener)
+    preDrawListener = pdListener
+
     // Capture snapshot
     val cardImage = captureSnapshot()
 
-    // Create overlay at source position
+    // Create a full-screen overlay that blocks the modal target screen from
+    // being visible. We use PixelCopy to capture the current screen with
+    // hardware rendering preserved (clipToOutline, borderRadius, etc.).
+    val fullScreenOverlay = FrameLayout(context)
+    fullScreenOverlay.layoutParams = FrameLayout.LayoutParams(decorView.width, decorView.height)
+    fullScreenOverlay.isClickable = true
+    // Ensure the overlay renders above any views with elevation (e.g. ScreenStack children)
+    fullScreenOverlay.translationZ = 1000f
+
+    // PixelCopy captures from the surface (hardware-rendered, preserves outlines).
+    // We use a background HandlerThread for the callback to avoid deadlocking main.
+    // Note: context may be ThemedReactContext, not Activity directly.
+    val activity = (context as? android.app.Activity)
+      ?: (context as? com.facebook.react.bridge.ReactContext)?.currentActivity
+    val window = activity?.window
+    if (window != null) {
+      val blockerBitmap = Bitmap.createBitmap(decorView.width, decorView.height, Bitmap.Config.ARGB_8888)
+      val copyThread = android.os.HandlerThread("PixelCopyThread")
+      copyThread.start()
+      val copyHandler = Handler(copyThread.looper)
+      val latch = java.util.concurrent.CountDownLatch(1)
+      android.view.PixelCopy.request(window, blockerBitmap, { result ->
+        Log.d(TAG, "prepareExpand: PixelCopy result=$result (0=SUCCESS)")
+        latch.countDown()
+      }, copyHandler)
+      // Wait for the copy (typically <5ms)
+      try { latch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {}
+      copyThread.quitSafely()
+
+      val blockerImg = ImageView(context)
+      blockerImg.setImageBitmap(blockerBitmap)
+      blockerImg.scaleType = ImageView.ScaleType.FIT_XY
+      blockerImg.layoutParams = FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        FrameLayout.LayoutParams.MATCH_PARENT
+      )
+      fullScreenOverlay.addView(blockerImg)
+    }
+
+    // Create card overlay at source position (on top of screen capture)
     val bgColor = cardBgColor
     val wrapper = FrameLayout(context)
     wrapper.layoutParams = FrameLayout.LayoutParams(cardWidth.toInt(), cardHeight.toInt())
@@ -317,9 +539,11 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     content.scaleType = ImageView.ScaleType.FIT_XY
     content.layoutParams = FrameLayout.LayoutParams(cardWidth.toInt(), cardHeight.toInt())
     wrapper.addView(content)
+    wrapper.tag = "morphCardWrapper"
+    fullScreenOverlay.addView(wrapper)
 
-    decorView.addView(wrapper)
-    overlayContainer = wrapper
+    decorView.addView(fullScreenOverlay)
+    overlayContainer = fullScreenOverlay
 
     // Hide source card — overlay covers it
     alpha = 0f
@@ -382,6 +606,36 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     // Stop intercepting new screens — animation is taking over
     removeHierarchyListener()
 
+    // The PixelCopy blocker bitmap contains the source card at its original position.
+    // Replace the card area with the surrounding background color so the card wrapper
+    // animates without a duplicate underneath, and no transparent hole is visible.
+    val blockerImg = wrapper.findViewWithTag<FrameLayout>("morphCardWrapper")?.let { cardW ->
+      (0 until wrapper.childCount).map { wrapper.getChildAt(it) }.firstOrNull { it !== cardW }
+    } as? ImageView
+    if (blockerImg != null) {
+      val bmp = (blockerImg.drawable as? BitmapDrawable)?.bitmap
+      if (bmp != null) {
+        val clearCanvas = Canvas(bmp)
+        // Sample the background color from a pixel just outside the card area
+        val sampleX = max(0, cardLeft.toInt() - 1)
+        val sampleY = min(bmp.height - 1, (cardTop + cardHeight / 2).toInt())
+        val bgColor = if (sampleX >= 0 && sampleX < bmp.width && sampleY >= 0 && sampleY < bmp.height) {
+          bmp.getPixel(sampleX, sampleY)
+        } else {
+          Color.WHITE
+        }
+        // First clear the card area to transparent
+        val clearPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        clearPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        clearCanvas.drawRect(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight, clearPaint)
+        // Then fill with the sampled background color (no transparent hole)
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        fillPaint.color = bgColor
+        clearCanvas.drawRect(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight, fillPaint)
+        blockerImg.invalidate()
+      }
+    }
+
     // Read target position (now settled after delay)
     val d = density
     val targetLoc = if (targetView != null) getLocationInWindow(targetView) else intArrayOf(cardLeft.toInt(), cardTop.toInt())
@@ -405,7 +659,9 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     Log.d(TAG, "animateExpand: pendingTarget w=${pendingTargetWidth} h=${pendingTargetHeight} br=${pendingTargetBorderRadius}")
 
     val dur = duration.toLong()
-    val content = if (wrapper.childCount > 0) wrapper.getChildAt(0) else null
+    // Find the card wrapper inside the full-screen overlay
+    val cardWrapper = wrapper.findViewWithTag<FrameLayout>("morphCardWrapper") ?: wrapper
+    val content = if (cardWrapper.childCount > 0) cardWrapper.getChildAt(0) else null
 
     // Compute content offset for wrapper mode
     val contentCx = if (hasWrapper && pendingContentCentered) (targetWidthPx - cardWidth) / 2f else 0f
@@ -423,13 +679,14 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
     animator.addUpdateListener { anim ->
       val t = anim.animatedValue as Float
-      wrapper.x = lerp(cardLeft, targetLeft, t)
-      wrapper.y = lerp(cardTop, targetTop, t)
-      val lp = wrapper.layoutParams
+
+      cardWrapper.x = lerp(cardLeft, targetLeft, t)
+      cardWrapper.y = lerp(cardTop, targetTop, t)
+      val lp = cardWrapper.layoutParams
       lp.width = lerp(cardWidth, targetWidthPx, t).toInt()
       lp.height = lerp(cardHeight, targetHeightPx, t).toInt()
-      wrapper.layoutParams = lp
-      setRoundedCorners(wrapper, lerp(cardCornerRadiusPx, targetCornerRadiusPx, t))
+      cardWrapper.layoutParams = lp
+      setRoundedCorners(cardWrapper, lerp(cardCornerRadiusPx, targetCornerRadiusPx, t))
 
       if (content != null) {
         if (hasWrapper) {
@@ -447,11 +704,18 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     }
 
     // Crossfade: at 15% of animation, make target screen VISIBLE with alpha=0
-    // then fade alpha to 1 over 50% of duration
+    // then fade alpha to 1 over 50% of duration.
     val targetScreen = targetScreenContainerRef?.get()
-    val sourceScreen = sourceScreenContainerRef?.get()
-    if (targetScreen != null && targetScreen !== sourceScreen) {
+    val sourceScreen2 = sourceScreenContainerRef?.get()
+    if (targetScreen != null && targetScreen !== sourceScreen2) {
       mainHandler.postDelayed({
+        // Remove the blocker so the target screen can fade in underneath the card wrapper
+        val blocker = wrapper.findViewWithTag<FrameLayout>("morphCardWrapper")?.let { cardW ->
+          (0 until wrapper.childCount).map { wrapper.getChildAt(it) }.firstOrNull { it !== cardW }
+        }
+        if (blocker != null) {
+          (blocker.parent as? ViewGroup)?.removeView(blocker)
+        }
         // Switch from INVISIBLE to VISIBLE but with alpha=0
         targetScreen.alpha = 0f
         targetScreen.visibility = View.VISIBLE
@@ -506,8 +770,9 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       return
     }
 
-    // Get the bitmap from the overlay
-    val origImg = if (overlay.childCount > 0) overlay.getChildAt(0) as? ImageView else null
+    // Get the bitmap from the card wrapper inside the overlay
+    val cardWrap = overlay.findViewWithTag<FrameLayout>("morphCardWrapper") ?: overlay
+    val origImg = if (cardWrap.childCount > 0) cardWrap.getChildAt(0) as? ImageView else null
     val bitmap = if (origImg != null) {
       // Extract the bitmap from the drawable
       val drawable = origImg.drawable
@@ -534,7 +799,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
           target.width.toFloat(), target.height.toFloat())
       }
 
-      target.showSnapshot(bitmap, ImageView.ScaleType.FIT_XY, frame, cornerRadius, cardBgColor)
+      target.showSnapshot(bitmap, ImageView.ScaleType.FIT_XY, frame, cornerRadius, null)
       Log.d(TAG, "transferSnapshot: handed snapshot to MorphCardTargetView")
     }
 
