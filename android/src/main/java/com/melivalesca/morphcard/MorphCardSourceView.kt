@@ -100,124 +100,19 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
   // ── Snapshot ──
 
-  /**
-   * Capture a snapshot of the source card's children WITHOUT border radius clipping.
-   * Like iOS, we want the raw content (e.g. the full rectangular image), not what's
-   * visually clipped on screen. The border radius is applied separately during animation.
-   *
-   * This disables both Android's clipToOutline AND Fresco's RoundingParams (used by
-   * React Native's Image component) to capture the full rectangular content.
-   */
   private fun captureSnapshot(): Bitmap {
     val w = width
     val h = height
     val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-
-    // Track Fresco views to restore rounding after capture
-    data class FrescoState(val view: View, val hierarchy: Any, val roundingParams: Any)
-    val frescoStates = mutableListOf<FrescoState>()
-    // Track views whose clipToOutline was disabled
-    val clippedViews = mutableListOf<View>()
-
-    // Map of Fresco views to their hierarchy (for drawing drawable directly)
-    val frescoViews = mutableMapOf<View, Any>()
-
-    fun prepareView(view: View) {
-      // Disable outline clipping
-      if (view.clipToOutline) {
-        clippedViews.add(view)
-        view.clipToOutline = false
-      }
-
-      // Detect Fresco DraweeView and disable rounding
-      try {
-        val getHierarchy = view.javaClass.getMethod("getHierarchy")
-        val hierarchy = getHierarchy.invoke(view)
-        if (hierarchy != null) {
-          val getRounding = hierarchy.javaClass.getMethod("getRoundingParams")
-          val rounding = getRounding.invoke(hierarchy)
-          if (rounding != null) {
-            val roundingClass = Class.forName("com.facebook.drawee.generic.RoundingParams")
-            val setRounding = hierarchy.javaClass.getMethod("setRoundingParams", roundingClass)
-            setRounding.invoke(hierarchy, null)
-            frescoStates.add(FrescoState(view, hierarchy, rounding))
-            frescoViews[view] = hierarchy
-            Log.d(TAG, "captureSnapshot: disabled Fresco rounding on ${view.width}x${view.height}")
-          }
-        }
-      } catch (_: Exception) {}
-
-      if (view is ViewGroup) {
-        for (i in 0 until view.childCount) {
-          prepareView(view.getChildAt(i))
-        }
-      }
-    }
-
-    for (i in 0 until childCount) {
-      prepareView(getChildAt(i))
-    }
-
-    // Draw children. For Fresco views, draw the top-level drawable directly
-    // (since the internal drawable is rebuilt when roundingParams changes).
-    fun drawView(view: View, c: Canvas) {
-      val hierarchy = frescoViews[view]
-      if (hierarchy != null) {
-        try {
-          val getTopDrawable = hierarchy.javaClass.getMethod("getTopLevelDrawable")
-          val drawable = getTopDrawable.invoke(hierarchy) as? android.graphics.drawable.Drawable
-          if (drawable != null) {
-            drawable.setBounds(0, 0, view.width, view.height)
-            drawable.invalidateSelf()
-            drawable.draw(c)
-            Log.d(TAG, "captureSnapshot: drew Fresco drawable directly ${view.width}x${view.height}")
-            return
-          }
-        } catch (_: Exception) {}
-      }
-
-      if (view is ViewGroup) {
-        // Draw background
-        view.background?.let { bg ->
-          bg.setBounds(0, 0, view.width, view.height)
-          bg.draw(c)
-        }
-        for (i in 0 until view.childCount) {
-          val child = view.getChildAt(i)
-          if (child.visibility != VISIBLE) continue
-          c.save()
-          c.translate(child.left.toFloat(), child.top.toFloat())
-          drawView(child, c)
-          c.restore()
-        }
-      } else {
-        view.draw(c)
-      }
-    }
-
     for (i in 0 until childCount) {
       val child = getChildAt(i)
       if (child.visibility != VISIBLE) continue
       canvas.save()
       canvas.translate(child.left.toFloat(), child.top.toFloat())
-      drawView(child, canvas)
+      child.draw(canvas)
       canvas.restore()
     }
-
-    // Restore clipToOutline
-    for (view in clippedViews) {
-      view.clipToOutline = true
-    }
-    // Restore Fresco rounding params
-    for (state in frescoStates) {
-      try {
-        val roundingClass = Class.forName("com.facebook.drawee.generic.RoundingParams")
-        val setRounding = state.hierarchy.javaClass.getMethod("setRoundingParams", roundingClass)
-        setRounding.invoke(state.hierarchy, state.roundingParams)
-      } catch (_: Exception) {}
-    }
-
     return bitmap
   }
 

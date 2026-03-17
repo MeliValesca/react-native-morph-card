@@ -141,7 +141,8 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   return [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
     for (UIView *child in self.subviews) {
       CGContextSaveGState(ctx.CGContext);
-      CGContextTranslateCTM(ctx.CGContext, child.frame.origin.x, child.frame.origin.y);
+      CGContextTranslateCTM(ctx.CGContext, child.frame.origin.x,
+                            child.frame.origin.y);
       [child drawViewHierarchyInRect:(CGRect){CGPointZero, child.frame.size}
                   afterScreenUpdates:NO];
       CGContextRestoreGState(ctx.CGContext);
@@ -258,9 +259,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
           UIView *ts = self->_targetScreenContainer;
           if (ts) {
             [UIView animateWithDuration:dur * 0.5
-                animations:^{
-                  ts.alpha = 1;
-                }
+                animations:^{ ts.alpha = 1; }
                 completion:nil];
           }
         });
@@ -284,14 +283,8 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       self.alpha = 1;
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
-      [UIView animateWithDuration:0.2
-          animations:^{
-            wrapper.alpha = 0;
-          }
-          completion:^(BOOL finished) {
-            [wrapper removeFromSuperview];
-            self->_wrapperView = nil;
-          }];
+      [wrapper removeFromSuperview];
+      self->_wrapperView = nil;
       resolve(@(YES));
     }];
 
@@ -345,9 +338,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
           UIView *ts = self->_targetScreenContainer;
           if (ts) {
             [UIView animateWithDuration:dur * 0.5
-                animations:^{
-                  ts.alpha = 1;
-                }
+                animations:^{ ts.alpha = 1; }
                 completion:nil];
           }
         });
@@ -365,15 +356,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       self.alpha = 1;
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
-      [UIView animateWithDuration:0.2
-          animations:^{
-            container.alpha = 0;
-          }
-          completion:^(BOOL finished) {
-            [container removeFromSuperview];
-            self->_wrapperView = nil;
-            self->_snapshot = nil;
-          }];
+      [container removeFromSuperview];
+      self->_wrapperView = nil;
+      self->_snapshot = nil;
       resolve(@(YES));
     }];
 
