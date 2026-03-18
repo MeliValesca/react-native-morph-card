@@ -342,8 +342,9 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     // Ensure the overlay renders above any views with elevation (e.g. ScreenStack children)
     fullScreenOverlay.translationZ = 1000f
 
-    // PixelCopy captures from the surface (hardware-rendered, preserves outlines).
-    // We use a background HandlerThread for the callback to avoid deadlocking main.
+    // PixelCopy captures the current screen with hardware rendering preserved
+    // (clipToOutline, borderRadius, etc.). The result is delivered on a background
+    // HandlerThread, then posted to main to add the blocker image.
     // Note: context may be ThemedReactContext, not Activity directly.
     val activity = (context as? android.app.Activity)
       ?: (context as? com.facebook.react.bridge.ReactContext)?.currentActivity
@@ -353,23 +354,25 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       val copyThread = android.os.HandlerThread("PixelCopyThread")
       copyThread.start()
       val copyHandler = Handler(copyThread.looper)
-      val latch = java.util.concurrent.CountDownLatch(1)
       android.view.PixelCopy.request(window, blockerBitmap, { result ->
-        Log.d(TAG, "prepareExpand: PixelCopy result=$result (0=SUCCESS)")
-        latch.countDown()
+        copyThread.quitSafely()
+        if (result == android.view.PixelCopy.SUCCESS) {
+          mainHandler.post {
+            val blockerImg = ImageView(context)
+            blockerImg.setImageBitmap(blockerBitmap)
+            blockerImg.scaleType = ImageView.ScaleType.FIT_XY
+            blockerImg.layoutParams = FrameLayout.LayoutParams(
+              FrameLayout.LayoutParams.MATCH_PARENT,
+              FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            // Insert behind the card wrapper (index 0)
+            fullScreenOverlay.addView(blockerImg, 0)
+          }
+        } else {
+          Log.w(TAG, "prepareExpand: PixelCopy failed with result=$result")
+          blockerBitmap.recycle()
+        }
       }, copyHandler)
-      // Wait for the copy (typically <5ms)
-      try { latch.await(100, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {}
-      copyThread.quitSafely()
-
-      val blockerImg = ImageView(context)
-      blockerImg.setImageBitmap(blockerBitmap)
-      blockerImg.scaleType = ImageView.ScaleType.FIT_XY
-      blockerImg.layoutParams = FrameLayout.LayoutParams(
-        FrameLayout.LayoutParams.MATCH_PARENT,
-        FrameLayout.LayoutParams.MATCH_PARENT
-      )
-      fullScreenOverlay.addView(blockerImg)
     }
 
     // Create card overlay at source position (on top of screen capture)

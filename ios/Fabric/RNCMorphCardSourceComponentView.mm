@@ -201,11 +201,16 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 }
 
 /// Schedule the screen-fade dispatch_after used by both collapse modes.
+/// Guards against the race where the animation completes before the
+/// dispatch fires — if cleanup already ran, _isExpanded is NO.
 - (void)scheduleScreenFadeOut:(UIView *)screenView
                      duration:(NSTimeInterval)dur {
+  __weak RNCMorphCardSourceComponentView *weakSelf = self;
   dispatch_after(
       dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
       dispatch_get_main_queue(), ^{
+        RNCMorphCardSourceComponentView *strongSelf = weakSelf;
+        if (!strongSelf || !strongSelf->_isExpanded) return;
         [UIView animateWithDuration:dur * 0.65
             animations:^{
               if (screenView) { screenView.alpha = 0; }
@@ -305,10 +310,13 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     }
 
     // Start fading in screen content early (at 15% of the animation).
+    __weak RNCMorphCardSourceComponentView *weakSelf = self;
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
-          UIView *ts = self->_targetScreenContainer;
+          RNCMorphCardSourceComponentView *strongSelf = weakSelf;
+          if (!strongSelf || !strongSelf->_isExpanded) return;
+          UIView *ts = strongSelf->_targetScreenContainer;
           if (ts) {
             [UIView animateWithDuration:dur * 0.5
                 animations:^{ ts.alpha = 1; }
@@ -384,10 +392,13 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
               }];
 
     // Start fading in screen content early (at 15% of the animation).
+    __weak RNCMorphCardSourceComponentView *weakSelf2 = self;
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
-          UIView *ts = self->_targetScreenContainer;
+          RNCMorphCardSourceComponentView *strongSelf2 = weakSelf2;
+          if (!strongSelf2 || !strongSelf2->_isExpanded) return;
+          UIView *ts = strongSelf2->_targetScreenContainer;
           if (ts) {
             [UIView animateWithDuration:dur * 0.5
                 animations:^{ ts.alpha = 1; }

@@ -24,7 +24,7 @@
 @implementation RNCMorphCardSource {
   // Saved state for collapsing back.
   CGRect _originalFrame;
-  UIView *_originalSuperview;
+  __weak UIView *_originalSuperview;
   NSInteger _originalIndex;
   CGFloat _originalCornerRadius;
   BOOL _isExpanded;

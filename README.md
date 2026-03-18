@@ -2,6 +2,8 @@
 
 Native card-to-modal morph transition for React Native. Smoothly animates a card from a list into a fullscreen detail view, morphing size, position, and corner radius — then collapses back.
 
+<video src="assets/demo.mov">
+
 - Native animations on both platforms (UIKit `UIViewPropertyAnimator` / Android `ValueAnimator`)
 - No JS-driven animation, no webview, no experimental flags
 - Works with any navigation setup (React Navigation, expo-router, etc.)
@@ -49,7 +51,11 @@ Wrap your card content in `MorphCardSource`. On the detail screen, use `MorphCar
 ```tsx
 import React from 'react';
 import { View, Image, Text, Pressable } from 'react-native';
-import { MorphCardSource, MorphCardTarget, useMorphTarget } from 'react-native-morph-card';
+import {
+  MorphCardSource,
+  MorphCardTarget,
+  useMorphTarget,
+} from 'react-native-morph-card';
 
 // ── List screen ──
 const ListScreen = ({ navigation }) => {
@@ -96,30 +102,30 @@ const DetailScreen = ({ route, navigation }) => {
 
 Wraps the card content on the list/grid screen. Captures a snapshot and drives the expand animation.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `width` | `DimensionValue` | — | Card width |
-| `height` | `DimensionValue` | — | Card height |
-| `borderRadius` | `number` | `0` | Corner radius of the card |
-| `backgroundColor` | `string` | — | Background color (enables "wrapper mode" where the background expands separately from the content) |
-| `duration` | `number` | `300` | Default animation duration in ms (used for both expand and collapse if specific durations are not set) |
-| `expandDuration` | `number` | — | Duration of the expand animation in ms. Overrides `duration` for expand. |
-| `scaleMode` | `'aspectFill' \| 'aspectFit' \| 'stretch'` | `'aspectFill'` | How the snapshot scales during no-wrapper mode animation |
-| `onPress` | `(sourceTag: number) => void` | — | Called on tap with the native view tag. Use this to navigate to the detail screen. |
+| Prop              | Type                                       | Default        | Description                                                                                            |
+| ----------------- | ------------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `width`           | `DimensionValue`                           | —              | Card width                                                                                             |
+| `height`          | `DimensionValue`                           | —              | Card height                                                                                            |
+| `borderRadius`    | `number`                                   | `0`            | Corner radius of the card                                                                              |
+| `backgroundColor` | `string`                                   | —              | Background color (enables "wrapper mode" where the background expands separately from the content)     |
+| `duration`        | `number`                                   | `300`          | Default animation duration in ms (used for both expand and collapse if specific durations are not set) |
+| `expandDuration`  | `number`                                   | —              | Duration of the expand animation in ms. Overrides `duration` for expand.                               |
+| `scaleMode`       | `'aspectFill' \| 'aspectFit' \| 'stretch'` | `'aspectFill'` | How the snapshot scales during no-wrapper mode animation                                               |
+| `onPress`         | `(sourceTag: number) => void`              | —              | Called on tap with the native view tag. Use this to navigate to the detail screen.                     |
 
 ### `<MorphCardTarget>`
 
 Placed on the detail screen where the card should land. Triggers the expand animation on mount.
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `sourceTag` | `number` | **required** | The source view tag from navigation params |
-| `width` | `DimensionValue` | source width | Target width after expand |
-| `height` | `DimensionValue` | source height | Target height after expand |
-| `borderRadius` | `number` | source radius | Target corner radius. Set to `0` for no rounding. |
-| `collapseDuration` | `number` | — | Duration of the collapse animation in ms. Falls back to the source's `duration`. |
-| `contentOffsetY` | `number` | `0` | Vertical offset for content snapshot in wrapper mode |
-| `contentCentered` | `boolean` | `false` | Center content snapshot horizontally in wrapper mode |
+| Prop               | Type             | Default       | Description                                                                      |
+| ------------------ | ---------------- | ------------- | -------------------------------------------------------------------------------- |
+| `sourceTag`        | `number`         | **required**  | The source view tag from navigation params                                       |
+| `width`            | `DimensionValue` | source width  | Target width after expand                                                        |
+| `height`           | `DimensionValue` | source height | Target height after expand                                                       |
+| `borderRadius`     | `number`         | source radius | Target corner radius. Set to `0` for no rounding.                                |
+| `collapseDuration` | `number`         | —             | Duration of the collapse animation in ms. Falls back to the source's `duration`. |
+| `contentOffsetY`   | `number`         | `0`           | Vertical offset for content snapshot in wrapper mode                             |
+| `contentCentered`  | `boolean`        | `false`       | Center content snapshot horizontally in wrapper mode                             |
 
 ### `useMorphTarget(options)`
 
@@ -139,7 +145,11 @@ const { dismiss } = useMorphTarget({
 For more control, use the imperative functions:
 
 ```tsx
-import { morphExpand, morphCollapse, getViewTag } from 'react-native-morph-card';
+import {
+  morphExpand,
+  morphCollapse,
+  getViewTag,
+} from 'react-native-morph-card';
 
 // Expand from source to target
 await morphExpand(sourceRef, targetRef);
@@ -150,7 +160,8 @@ await morphCollapse(sourceTag);
 // Get the native view tag from a ref
 const tag = getViewTag(viewRef);
 ```
-```
+
+````
 
 ## Running the example app
 
@@ -181,7 +192,7 @@ yarn install
 # Install example app dependencies
 cd example
 yarn install
-```
+````
 
 ### 2. Run on iOS
 
@@ -233,12 +244,12 @@ yarn build:android
 
 ### Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `pod install` fails | Run `bundle install` first, then `bundle exec pod install` |
-| Android build fails on first run | Make sure `ANDROID_HOME` is set and an emulator/device is available |
-| Metro can't find `react-native-morph-card` | Run `yarn install` at the repo root first |
-| Duplicate module errors | Delete `node_modules` in both root and `example/`, then reinstall |
+| Problem                                    | Fix                                                                 |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `pod install` fails                        | Run `bundle install` first, then `bundle exec pod install`          |
+| Android build fails on first run           | Make sure `ANDROID_HOME` is set and an emulator/device is available |
+| Metro can't find `react-native-morph-card` | Run `yarn install` at the repo root first                           |
+| Duplicate module errors                    | Delete `node_modules` in both root and `example/`, then reinstall   |
 
 ## Contributing
 
