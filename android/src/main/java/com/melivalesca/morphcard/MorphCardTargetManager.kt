@@ -35,11 +35,11 @@ class MorphCardTargetManager :
   }
 
   override fun setTargetWidth(view: MorphCardTargetView, value: Double) {
-    view.targetWidth = value.toFloat()
+    // Managed by the source view; required by codegen interface
   }
 
   override fun setTargetHeight(view: MorphCardTargetView, value: Double) {
-    view.targetHeight = value.toFloat()
+    // Managed by the source view; required by codegen interface
   }
 
   override fun setTargetBorderRadius(view: MorphCardTargetView, value: Double) {

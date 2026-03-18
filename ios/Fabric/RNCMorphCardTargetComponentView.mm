@@ -1,4 +1,5 @@
 #import "RNCMorphCardTargetComponentView.h"
+#import "RNCMorphCardSourceComponentView.h"
 #import "RNCMorphCardViewRegistry.h"
 
 #import <React/RCTFabricComponentsPlugins.h>
@@ -7,9 +8,11 @@
 
 using namespace facebook::react;
 
+// Declared in RNCMorphCardSourceComponentView.mm
+extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
+
 @implementation RNCMorphCardTargetComponentView {
   UIView *_snapshotContainer; // our own view — Fabric can't reset its styles
-  UIImageView *_snapshotView;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider {
@@ -35,17 +38,7 @@ using namespace facebook::react;
 
     // Immediately hide the detail screen container to prevent flicker.
     // The expand animation will fade it back in.
-    UIWindow *window = self.window;
-    CGRect windowBounds = window.bounds;
-    UIView *current = self.superview;
-    UIView *screenContainer = nil;
-    while (current && current != window) {
-      CGRect frameInWindow = [current convertRect:current.bounds toView:nil];
-      if (CGRectEqualToRect(frameInWindow, windowBounds)) {
-        screenContainer = current;
-      }
-      current = current.superview;
-    }
+    UIView *screenContainer = RNCMorphCardFindScreenContainer(self);
     if (screenContainer) {
       screenContainer.alpha = 0;
     }
@@ -77,14 +70,12 @@ using namespace facebook::react;
 
   [self addSubview:container];
   _snapshotContainer = container;
-  _snapshotView = iv;
 }
 
 - (void)clearSnapshot {
   if (_snapshotContainer) {
     [_snapshotContainer removeFromSuperview];
     _snapshotContainer = nil;
-    _snapshotView = nil;
   }
 }
 

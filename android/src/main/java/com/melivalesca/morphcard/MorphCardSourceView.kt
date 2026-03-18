@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Outline
 import android.graphics.RectF
 import android.graphics.Paint
 import android.graphics.PorterDuff
@@ -17,7 +16,6 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
@@ -87,16 +85,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
   private fun applyBorderRadiusClipping() {
     val radiusPx = if (borderRadiusDp > 0f) borderRadiusDp * density else 0f
-    if (radiusPx > 0f) {
-      clipToOutline = true
-      outlineProvider = object : ViewOutlineProvider() {
-        override fun getOutline(v: View, outline: Outline) {
-          outline.setRoundRect(0, 0, v.width, v.height, radiusPx)
-        }
-      }
-    } else {
-      clipToOutline = false
-    }
+    setRoundedCorners(this, radiusPx)
   }
 
   // ── Snapshot ──
@@ -124,27 +113,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     view.getLocationInWindow(loc)
     return loc
   }
-
-  /**
-   * Find the screen container for a view (ScreensCoordinatorLayout).
-   * Walks up until parent is ScreenStack/ScreenContainer.
-   */
-  private fun findScreenContainer(view: View?): View? {
-    if (view == null) return null
-    var current: View? = view
-    while (current != null) {
-      val parent = current.parent
-      if (parent is ViewGroup) {
-        val parentName = parent.javaClass.name
-        if (parentName.contains("ScreenStack") || parentName.contains("ScreenContainer")) {
-          return current
-        }
-      }
-      current = if (current.parent is View) current.parent as View else null
-    }
-    return null
-  }
-
 
   private fun extractBackgroundColor(): Int? {
     val bg = background ?: return null
@@ -212,19 +180,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
         val h = imageHeight * scale
         RectF((containerWidth - w) / 2f, (containerHeight - h) / 2f,
           (containerWidth + w) / 2f, (containerHeight + h) / 2f)
-      }
-    }
-  }
-
-  private fun setRoundedCorners(view: View, radiusPx: Float) {
-    if (radiusPx <= 0f) {
-      view.clipToOutline = false
-      return
-    }
-    view.clipToOutline = true
-    view.outlineProvider = object : ViewOutlineProvider() {
-      override fun getOutline(v: View, outline: Outline) {
-        outline.setRoundRect(0, 0, v.width, v.height, radiusPx)
       }
     }
   }
@@ -695,7 +650,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
           target.width.toFloat(), target.height.toFloat())
       }
 
-      target.showSnapshot(bitmap, ImageView.ScaleType.FIT_XY, frame, cornerRadius, null)
+      target.showSnapshot(bitmap, frame, cornerRadius, null)
       Log.d(TAG, "transferSnapshot: handed snapshot to MorphCardTargetView")
     }
 
@@ -804,13 +759,6 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       wrapper.addView(content)
       decorView.addView(wrapper)
       overlayContainer = wrapper
-    }
-
-    // Ensure wrapper is valid
-    if (wrapper == null) {
-      isExpanded = false
-      promise.resolve(false)
-      return
     }
 
     // Show source screen underneath

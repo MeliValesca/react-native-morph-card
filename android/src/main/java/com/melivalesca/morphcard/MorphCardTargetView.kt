@@ -3,22 +3,15 @@ package com.melivalesca.morphcard
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Matrix
-import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewOutlineProvider
-import android.widget.ImageView
 import com.facebook.react.views.view.ReactViewGroup
 
 class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
 
-  var targetWidth: Float = 0f
-  var targetHeight: Float = 0f
   var targetBorderRadius: Float = -1f
   var collapseDuration: Double = 0.0
   var sourceTag: Int = 0
@@ -37,13 +30,13 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   override fun onAttachedToWindow() {
     super.onAttachedToWindow()
     MorphCardViewRegistry.register(this, id)
-    Log.d("MorphCard", "TargetView attached: id=$id sourceTag=$sourceTag")
+    Log.d(TAG, "TargetView attached: id=$id sourceTag=$sourceTag")
 
     if (sourceTag > 0) {
       val screenContainer = findScreenContainer(this)
       if (screenContainer != null) {
         screenContainer.visibility = View.INVISIBLE
-        Log.d("MorphCard", "TargetView: set screen INVISIBLE")
+        Log.d(TAG, "TargetView: set screen INVISIBLE")
       }
     }
   }
@@ -104,42 +97,16 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
 
   private fun applyBorderRadiusClipping() {
     val radiusPx = if (targetBorderRadius > 0f) targetBorderRadius * density else 0f
-    if (radiusPx > 0f) {
-      clipToOutline = true
-      outlineProvider = object : ViewOutlineProvider() {
-        override fun getOutline(v: View, outline: Outline) {
-          outline.setRoundRect(0, 0, v.width, v.height, radiusPx)
-        }
-      }
-    } else {
-      clipToOutline = false
-    }
-  }
-
-  private fun findScreenContainer(view: View?): View? {
-    if (view == null) return null
-    var current: View? = view
-    while (current != null) {
-      val parent = current.parent
-      if (parent is ViewGroup) {
-        val parentName = parent.javaClass.name
-        if (parentName.contains("ScreenStack") || parentName.contains("ScreenContainer")) {
-          return current
-        }
-      }
-      current = if (current.parent is View) current.parent as View else null
-    }
-    return null
+    setRoundedCorners(this, radiusPx)
   }
 
   fun showSnapshot(
     image: Bitmap,
-    scaleType: ImageView.ScaleType,
     frame: RectF,
     cornerRadius: Float,
     backgroundColor: Int?
   ) {
-    Log.d("MorphCard", "showSnapshot: viewSize=${width}x${height} frame=$frame cornerR=$cornerRadius bg=$backgroundColor")
+    Log.d(TAG, "showSnapshot: viewSize=${width}x${height} frame=$frame cornerR=$cornerRadius bg=$backgroundColor")
     snapshotBitmap = image
     snapshotFrame = frame
     snapshotCornerRadius = cornerRadius
@@ -149,12 +116,16 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
 
   fun clearSnapshot() {
     if (snapshotBitmap != null) {
-      Log.d("MorphCard", "clearSnapshot: clearing bitmap")
+      Log.d(TAG, "clearSnapshot: clearing bitmap")
       snapshotBitmap = null
       snapshotFrame = null
       snapshotCornerRadius = 0f
       snapshotBgColor = null
       invalidate()
     }
+  }
+
+  companion object {
+    private const val TAG = "MorphCard"
   }
 }

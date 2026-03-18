@@ -14,9 +14,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)expandToTarget:(nullable UIView *)targetView
                resolve:(RCTPromiseResolveBlock)resolve;
 
-- (void)collapseFromTarget:(nullable UIView *)targetView
-                   resolve:(RCTPromiseResolveBlock)resolve;
-
 /// Collapse using the stored target from the last expand call.
 - (void)collapseWithResolve:(RCTPromiseResolveBlock)resolve;
 

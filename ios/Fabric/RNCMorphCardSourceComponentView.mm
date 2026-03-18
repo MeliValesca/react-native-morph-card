@@ -22,7 +22,7 @@ static UIWindow *getKeyWindow(void) {
   return nil;
 }
 
-static UIView *findScreenContainer(UIView *view) {
+UIView *RNCMorphCardFindScreenContainer(UIView *view) {
   UIWindow *window = view.window;
   if (!window) return nil;
 
@@ -71,6 +71,15 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
                       (containerSize.height - h) / 2, w, h);
   }
 }
+
+#pragma mark - Private interface
+
+@interface RNCMorphCardSourceComponentView ()
+
+- (void)collapseFromTarget:(nullable UIView *)targetView
+                   resolve:(RCTPromiseResolveBlock)resolve;
+
+@end
 
 @implementation RNCMorphCardSourceComponentView {
   CGFloat _duration;
@@ -152,6 +161,59 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   }];
 }
 
+#pragma mark - Shared helpers
+
+/// Compute the target frame and corner radius from the given target view
+/// (or fall back to _cardFrame if targetView is nil).
+- (CGRect)targetFrameForView:(UIView *)targetView
+                cornerRadius:(CGFloat *)outCornerRadius {
+  CGPoint targetOrigin = targetView
+      ? [targetView convertPoint:CGPointZero toView:nil]
+      : _cardFrame.origin;
+
+  CGFloat tw = self.pendingTargetWidth;
+  CGFloat th = self.pendingTargetHeight;
+  CGFloat tbr = self.pendingTargetBorderRadius;
+
+  CGRect targetFrame = CGRectMake(
+      targetOrigin.x,
+      targetOrigin.y,
+      tw > 0 ? tw : _cardFrame.size.width,
+      th > 0 ? th : _cardFrame.size.height);
+
+  if (outCornerRadius) {
+    *outCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+  }
+  return targetFrame;
+}
+
+/// Shared cleanup performed at the end of every collapse animation.
+- (void)collapseCleanupWithContainer:(UIView *)container
+                             resolve:(RCTPromiseResolveBlock)resolve {
+  [container removeFromSuperview];
+  _wrapperView = nil;
+  _snapshot = nil;
+  self.alpha = 1;
+  _isExpanded = NO;
+  _sourceScreenContainer = nil;
+  _targetScreenContainer = nil;
+  resolve(@(YES));
+}
+
+/// Schedule the screen-fade dispatch_after used by both collapse modes.
+- (void)scheduleScreenFadeOut:(UIView *)screenView
+                     duration:(NSTimeInterval)dur {
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
+      dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:dur * 0.65
+            animations:^{
+              if (screenView) { screenView.alpha = 0; }
+            }
+            completion:nil];
+      });
+}
+
 #pragma mark - Expand
 
 - (void)expandToTarget:(UIView *)targetView
@@ -179,30 +241,18 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   UIImage *cardImage = [self captureSnapshot];
 
   // ── 3. Keep source screen visible during navigation transition ──
-  UIView *sourceScreen = findScreenContainer(self);
+  UIView *sourceScreen = RNCMorphCardFindScreenContainer(self);
   _sourceScreenContainer = sourceScreen;
-  _targetScreenContainer = findScreenContainer(targetView);
+  _targetScreenContainer = RNCMorphCardFindScreenContainer(targetView);
 
   if (sourceScreen) {
     sourceScreen.alpha = 1;
   }
 
   // ── 4. Compute target frame and corner radius ──
-  CGPoint targetOrigin = targetView
-      ? [targetView convertPoint:CGPointZero toView:nil]
-      : _cardFrame.origin;
-
-  CGFloat tw = self.pendingTargetWidth;
-  CGFloat th = self.pendingTargetHeight;
-  CGFloat tbr = self.pendingTargetBorderRadius;
-
-  CGRect targetFrame = CGRectMake(
-      targetOrigin.x,
-      targetOrigin.y,
-      tw > 0 ? tw : _cardFrame.size.width,
-      th > 0 ? th : _cardFrame.size.height);
-
-  CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+  CGFloat targetCornerRadius = 0;
+  CGRect targetFrame = [self targetFrameForView:targetView
+                                   cornerRadius:&targetCornerRadius];
 
   NSTimeInterval dur = (_expandDuration > 0 ? _expandDuration : _duration) / 1000.0;
 
@@ -405,17 +455,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       UIImage *cardImage = [self captureSnapshot];
       self.alpha = 0;
 
-      CGPoint targetOrigin = targetView
-          ? [targetView convertPoint:CGPointZero toView:nil]
-          : _cardFrame.origin;
-      CGFloat tw = self.pendingTargetWidth;
-      CGFloat th = self.pendingTargetHeight;
-      CGFloat tbr = self.pendingTargetBorderRadius;
-      CGRect targetFrame = CGRectMake(
-          targetOrigin.x, targetOrigin.y,
-          tw > 0 ? tw : _cardFrame.size.width,
-          th > 0 ? th : _cardFrame.size.height);
-      CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+      CGFloat targetCornerRadius = 0;
+      CGRect targetFrame = [self targetFrameForView:targetView
+                                       cornerRadius:&targetCornerRadius];
 
       CGFloat contentOffsetY = self.pendingContentOffsetY;
       BOOL contentCentered = self.pendingContentCentered;
@@ -462,25 +504,11 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       }
     }];
 
-    // Fade out target screen concurrently at 15%, over 65% of duration
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(), ^{
-          [UIView animateWithDuration:dur * 0.65
-              animations:^{
-                if (targetScreen) { targetScreen.alpha = 0; }
-              }
-              completion:nil];
-        });
+    // Fade out target screen
+    [self scheduleScreenFadeOut:targetScreen duration:dur];
 
     [animator addCompletion:^(UIViewAnimatingPosition pos) {
-      [wrapper removeFromSuperview];
-      self->_wrapperView = nil;
-      self.alpha = 1;
-      self->_isExpanded = NO;
-      self->_sourceScreenContainer = nil;
-      self->_targetScreenContainer = nil;
-      resolve(@(YES));
+      [self collapseCleanupWithContainer:wrapper resolve:resolve];
     }];
 
     [animator startAnimation];
@@ -495,17 +523,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       UIImage *cardImage = [self captureSnapshot];
       self.alpha = 0;
 
-      CGPoint targetOrigin = targetView
-          ? [targetView convertPoint:CGPointZero toView:nil]
-          : _cardFrame.origin;
-      CGFloat tw = self.pendingTargetWidth;
-      CGFloat th = self.pendingTargetHeight;
-      CGFloat tbr = self.pendingTargetBorderRadius;
-      CGRect targetFrame = CGRectMake(
-          targetOrigin.x, targetOrigin.y,
-          tw > 0 ? tw : _cardFrame.size.width,
-          th > 0 ? th : _cardFrame.size.height);
-      CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
+      CGFloat targetCornerRadius = 0;
+      CGRect targetFrame = [self targetFrameForView:targetView
+                                       cornerRadius:&targetCornerRadius];
 
       CGSize imageSize = cardImage.size;
       CGRect imageFrame = imageFrameForScaleMode(
@@ -530,38 +550,23 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       sourceScreen.alpha = 1;
     }
 
-    UICubicTimingParameters *timing2 = [[UICubicTimingParameters alloc]
+    UICubicTimingParameters *timing = [[UICubicTimingParameters alloc]
         initWithControlPoint1:CGPointMake(0.25, 1.0)
                 controlPoint2:CGPointMake(0.5, 1.0)];
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
-        timingParameters:timing2];
+        timingParameters:timing];
     [animator addAnimations:^{
       container.frame = self->_cardFrame;
       container.layer.cornerRadius = self->_cardCornerRadius;
       snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
     }];
 
-    // Fade out target screen concurrently at 15%, over 65% of duration
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(), ^{
-          [UIView animateWithDuration:dur * 0.65
-              animations:^{
-                if (targetScreen) { targetScreen.alpha = 0; }
-              }
-              completion:nil];
-        });
+    // Fade out target screen
+    [self scheduleScreenFadeOut:targetScreen duration:dur];
 
     [animator addCompletion:^(UIViewAnimatingPosition pos) {
-      [container removeFromSuperview];
-      self->_wrapperView = nil;
-      self->_snapshot = nil;
-      self.alpha = 1;
-      self->_isExpanded = NO;
-      self->_sourceScreenContainer = nil;
-      self->_targetScreenContainer = nil;
-      resolve(@(YES));
+      [self collapseCleanupWithContainer:container resolve:resolve];
     }];
 
     [animator startAnimation];
