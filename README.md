@@ -2,8 +2,6 @@
 
 Native card-to-modal morph transition for React Native. Smoothly animates a card from a list into a fullscreen detail view, morphing size, position, and corner radius — then collapses back.
 
-https://github.com/user-attachments/assets/93f0c1f6-e203-496e-bb56-c994e1500e32
-
 - Native animations on both platforms (UIKit `UIViewPropertyAnimator` / Android `ValueAnimator`)
 - No JS-driven animation, no webview, no experimental flags
 - Works with any navigation setup (React Navigation, expo-router, etc.)
