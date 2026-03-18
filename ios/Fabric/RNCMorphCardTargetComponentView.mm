@@ -24,6 +24,7 @@ using namespace facebook::react;
   _targetWidth = newProps.targetWidth;
   _targetHeight = newProps.targetHeight;
   _targetBorderRadius = newProps.targetBorderRadius;
+  _collapseDuration = newProps.collapseDuration;
   [super updateProps:props oldProps:oldProps];
 }
 

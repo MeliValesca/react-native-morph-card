@@ -26,6 +26,10 @@ class MorphCardTargetManager :
     // Duration is managed by the source view
   }
 
+  override fun setCollapseDuration(view: MorphCardTargetView, value: Double) {
+    view.collapseDuration = value
+  }
+
   override fun setSourceTag(view: MorphCardTargetView, value: Int) {
     view.sourceTag = value
   }

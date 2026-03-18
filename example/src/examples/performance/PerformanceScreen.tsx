@@ -29,6 +29,7 @@ export default function PerformanceScreen() {
       renderItem={({ item }) => (
         <View style={{ width: ITEM_SIZE, height: ITEM_SIZE, padding: 1 }}>
           <MorphCardSource
+            expandDuration={350}
             borderRadius={0}
             onPress={(sourceTag: number) =>
               navigation.navigate('PerformanceDetail', { sourceTag })

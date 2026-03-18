@@ -1,8 +1,5 @@
 import * as React from 'react';
 import {
-  requireNativeComponent,
-  type ViewProps,
-  type StyleProp,
   type ViewStyle,
   type DimensionValue,
   View,
@@ -10,25 +7,15 @@ import {
   type LayoutChangeEvent,
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
+import NativeTargetViewSpec from './specs/NativeMorphCardTarget';
 
-let NativeTargetView: React.ComponentType<
-  ViewProps & {
-    sourceTag?: number;
-    targetWidth?: number;
-    targetHeight?: number;
-    targetBorderRadius?: number;
-  }
->;
-
-try {
-  NativeTargetView = requireNativeComponent('RNCMorphCardTarget');
-} catch {
-  NativeTargetView = View;
-}
+const NativeTargetView = NativeTargetViewSpec ?? View;
 
 export interface MorphCardTargetProps {
   /** The sourceTag from route params — triggers expand on mount. */
   sourceTag: number;
+  /** Duration of the collapse animation in ms. Falls back to source's duration. */
+  collapseDuration?: number;
   /** Optional width override (number or '100%'). If omitted, source width is used. */
   width?: DimensionValue;
   /** Optional height override (number or '100%'). If omitted, source height is used. */
@@ -39,19 +26,16 @@ export interface MorphCardTargetProps {
   contentOffsetY?: number;
   /** Center the content snapshot horizontally inside the expanded wrapper (wrapper mode only). */
   contentCentered?: boolean;
-  /** Optional style for positioning (margin, position, etc). */
-  style?: StyleProp<ViewStyle>;
 }
 
 export const MorphCardTarget = ({
   sourceTag,
+  collapseDuration,
   width,
   height,
   borderRadius,
   contentOffsetY,
   contentCentered,
-  style,
-  ...rest
 }: MorphCardTargetProps) => {
   const nativeRef = React.useRef<any>(null);
   const expandedRef = React.useRef(false);
@@ -116,12 +100,12 @@ export const MorphCardTarget = ({
     <NativeTargetView
       ref={nativeRef}
       sourceTag={sourceTag}
+      collapseDuration={collapseDuration}
       targetWidth={0}
       targetHeight={0}
       targetBorderRadius={borderRadius != null ? borderRadius : -1}
-      style={[style, sizeStyle]}
+      style={sizeStyle}
       onLayout={handleLayout}
-      {...rest}
     />
   );
 };

@@ -23,6 +23,7 @@ export default function ProfileDetailScreen({ route, navigation }: Props) {
           sourceTag={route.params.sourceTag}
           width={'100%'}
           height={280}
+          collapseDuration={150}
           borderRadius={0}
           contentCentered
         />

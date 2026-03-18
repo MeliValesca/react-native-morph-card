@@ -16,6 +16,7 @@ export type ScaleMode = 'aspectFill' | 'aspectFit' | 'stretch';
 export interface MorphCardSourceProps {
   ref?: React.Ref<any>;
   duration?: number;
+  expandDuration?: number;
   width?: DimensionValue;
   height?: DimensionValue;
   borderRadius?: number;
@@ -29,6 +30,7 @@ export interface MorphCardSourceProps {
 export const MorphCardSource = ({
   children,
   duration = 300,
+  expandDuration,
   width,
   height,
   borderRadius,
@@ -61,7 +63,7 @@ export const MorphCardSource = ({
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} scaleMode={scaleMode} cardBorderRadius={borderRadius} style={style}>
+    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={scaleMode} cardBorderRadius={borderRadius} style={style}>
       {children}
     </NativeSourceView>
   );

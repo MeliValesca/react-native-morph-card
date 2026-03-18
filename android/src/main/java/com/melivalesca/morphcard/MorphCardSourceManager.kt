@@ -26,6 +26,10 @@ class MorphCardSourceManager :
     view.duration = value
   }
 
+  override fun setExpandDuration(view: MorphCardSourceView, value: Double) {
+    view.expandDuration = value
+  }
+
   override fun setScaleMode(view: MorphCardSourceView, value: String?) {
     view.scaleMode = value ?: "aspectFill"
   }

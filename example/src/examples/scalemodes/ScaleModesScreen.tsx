@@ -32,6 +32,7 @@ export default function ScaleModesScreen() {
             {item.description}
           </Text>
           <MorphCardSource
+            expandDuration={350}
             scaleMode={item.mode}
             borderRadius={16}
             height={180}

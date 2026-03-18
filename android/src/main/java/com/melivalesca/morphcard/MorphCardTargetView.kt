@@ -20,6 +20,7 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   var targetWidth: Float = 0f
   var targetHeight: Float = 0f
   var targetBorderRadius: Float = -1f
+  var collapseDuration: Double = 0.0
   var sourceTag: Int = 0
 
   // Snapshot drawn via canvas — Fabric can't remove it

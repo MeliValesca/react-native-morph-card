@@ -74,6 +74,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 
 @implementation RNCMorphCardSourceComponentView {
   CGFloat _duration;
+  CGFloat _expandDuration;
   UIViewContentMode _scaleMode;
   BOOL _isExpanded;
   BOOL _hasWrapper;
@@ -105,6 +106,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   const auto &newProps =
       *std::static_pointer_cast<const RNCMorphCardSourceProps>(props);
   _duration = newProps.duration > 0 ? newProps.duration : 500.0;
+  _expandDuration = newProps.expandDuration > 0 ? newProps.expandDuration : 0;
   auto sm = newProps.scaleMode;
   if (sm == RNCMorphCardSourceScaleMode::AspectFit) {
     _scaleMode = UIViewContentModeScaleAspectFit;
@@ -202,7 +204,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 
   CGFloat targetCornerRadius = tbr >= 0 ? tbr : _cardCornerRadius;
 
-  NSTimeInterval dur = _duration / 1000.0;
+  NSTimeInterval dur = (_expandDuration > 0 ? _expandDuration : _duration) / 1000.0;
 
   if (_hasWrapper) {
     // ══ WRAPPER MODE ══
@@ -389,7 +391,11 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     [(RNCMorphCardTargetComponentView *)targetView clearSnapshot];
   }
 
-  NSTimeInterval dur = _duration / 1000.0;
+  CGFloat collapseDur = 0;
+  if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
+    collapseDur = ((RNCMorphCardTargetComponentView *)targetView).collapseDuration;
+  }
+  NSTimeInterval dur = (collapseDur > 0 ? collapseDur : _duration) / 1000.0;
 
   if (_hasWrapper) {
     // ══ WRAPPER MODE COLLAPSE ══
@@ -442,22 +448,25 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 
     UIView *content = wrapper.subviews.firstObject;
 
+    UICubicTimingParameters *timing = [[UICubicTimingParameters alloc]
+        initWithControlPoint1:CGPointMake(0.25, 1.0)
+                controlPoint2:CGPointMake(0.5, 1.0)];
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
-            dampingRatio:0.85
-              animations:^{
-                wrapper.frame = self->_cardFrame;
-                wrapper.layer.cornerRadius = self->_cardCornerRadius;
-                if (content) {
-                  content.frame = (CGRect){CGPointZero, content.frame.size};
-                }
-              }];
+        timingParameters:timing];
+    [animator addAnimations:^{
+      wrapper.frame = self->_cardFrame;
+      wrapper.layer.cornerRadius = self->_cardCornerRadius;
+      if (content) {
+        content.frame = (CGRect){CGPointZero, content.frame.size};
+      }
+    }];
 
-    // Fade out target screen concurrently at 15% (mirrors expand's fade-in)
+    // Fade out target screen concurrently at 15%, over 65% of duration
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
-          [UIView animateWithDuration:dur * 0.5
+          [UIView animateWithDuration:dur * 0.65
               animations:^{
                 if (targetScreen) { targetScreen.alpha = 0; }
               }
@@ -521,20 +530,23 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       sourceScreen.alpha = 1;
     }
 
+    UICubicTimingParameters *timing2 = [[UICubicTimingParameters alloc]
+        initWithControlPoint1:CGPointMake(0.25, 1.0)
+                controlPoint2:CGPointMake(0.5, 1.0)];
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
-            dampingRatio:0.85
-              animations:^{
-                container.frame = self->_cardFrame;
-                container.layer.cornerRadius = self->_cardCornerRadius;
-                snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
-              }];
+        timingParameters:timing2];
+    [animator addAnimations:^{
+      container.frame = self->_cardFrame;
+      container.layer.cornerRadius = self->_cardCornerRadius;
+      snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
+    }];
 
-    // Fade out target screen concurrently at 15% (mirrors expand's fade-in)
+    // Fade out target screen concurrently at 15%, over 65% of duration
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(dur * 0.15 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
-          [UIView animateWithDuration:dur * 0.5
+          [UIView animateWithDuration:dur * 0.65
               animations:^{
                 if (targetScreen) { targetScreen.alpha = 0; }
               }

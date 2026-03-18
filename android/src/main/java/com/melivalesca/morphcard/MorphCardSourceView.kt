@@ -32,6 +32,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
   // ── Props (all in dp) ──
   var duration: Double = 500.0
+  var expandDuration: Double = 0.0
   var scaleMode: String = "aspectFill"
   var borderRadiusDp: Float = 0f
 
@@ -553,7 +554,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     Log.d(TAG, "animateExpand: target=[${targetLeft},${targetTop},${targetWidthPx}x${targetHeightPx}] cornerR=$targetCornerRadiusPx")
     Log.d(TAG, "animateExpand: pendingTarget w=${pendingTargetWidth} h=${pendingTargetHeight} br=${pendingTargetBorderRadius}")
 
-    val dur = duration.toLong()
+    val dur = (if (expandDuration > 0) expandDuration else duration).toLong()
     // Find the card wrapper inside the full-screen overlay
     val cardWrapper = wrapper.findViewWithTag<FrameLayout>("morphCardWrapper") ?: wrapper
     val content = if (cardWrapper.childCount > 0) cardWrapper.getChildAt(0) else null
@@ -749,7 +750,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     }
 
     val d = density
-    val dur = duration.toLong()
+    val targetCollapseDur = (targetView as? MorphCardTargetView)?.collapseDuration ?: 0.0
+    val dur = (if (targetCollapseDur > 0) targetCollapseDur else duration).toLong()
 
     // Create DecorView overlay for collapse animation.
     // Get snapshot from MorphCardTargetView if available, otherwise recapture.

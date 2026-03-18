@@ -7,6 +7,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) CGFloat targetWidth;
 @property (nonatomic, assign) CGFloat targetHeight;
 @property (nonatomic, assign) CGFloat targetBorderRadius;
+@property (nonatomic, assign) CGFloat collapseDuration;
 
 - (void)showSnapshot:(UIImage *)image
          contentMode:(UIViewContentMode)mode

@@ -63,6 +63,7 @@ export default function MixedScreen() {
             borderRadius={card.id === 'nowrap-2' ? 100 : 16}
             height={card.id === 'nowrap-2' ? 200 : 180}
             duration={1000}
+            expandDuration={350}
             onPress={(sourceTag: number) =>
               navigation.navigate('MixedDetail', { sourceTag, card })
             }

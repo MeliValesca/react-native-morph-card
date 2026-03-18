@@ -1,17 +1,30 @@
 # react-native-morph-card
 
-Native card-to-modal morph transition for React Native. The iOS App Store "card of the day" expand animation, as a library.
+Native card-to-modal morph transition for React Native. Smoothly animates a card from a list into a fullscreen detail view, morphing size, position, and corner radius — then collapses back.
 
-- Native animations on both platforms (UIKit `UIViewPropertyAnimator` / Android Transition framework)
+- Native animations on both platforms (UIKit `UIViewPropertyAnimator` / Android `ValueAnimator`)
 - No JS-driven animation, no webview, no experimental flags
-- Works with any navigation setup
-- Supports old and new React Native architecture (Paper + Fabric)
+- Works with any navigation setup (React Navigation, expo-router, etc.)
+- Supports React Native new architecture (Fabric)
 
-> **Status:** Early development — the skeleton is in place, native morph animation is not yet implemented.
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [API](#api)
+  - [`<MorphCardSource>`](#morphcardsource)
+  - [`<MorphCardTarget>`](#morphcardtarget)
+  - [`useMorphTarget`](#usemorphtargetoptions)
+  - [Imperative API](#imperative-api)
+- [Running the Example App](#running-the-example-app)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Installation
 
 ```sh
+npm install react-native-morph-card
+# or
 yarn add react-native-morph-card
 ```
 
@@ -27,18 +40,114 @@ No additional steps required.
 
 ## Usage
 
-```tsx
-import { MorphCardSource } from 'react-native-morph-card';
+Wrap your card content in `MorphCardSource`. On the detail screen, use `MorphCardTarget` where the card should land. Use `useMorphTarget` for easy collapse handling.
 
-function App() {
+> **Important:** `MorphCardSource` can wrap any React Native component (images, views, text, etc.), but during the animation the content is captured as a **bitmap snapshot**. This means dynamic or observable values (timers, animated values, live data) will freeze at the moment of capture. Design your card content with this in mind.
+
+```tsx
+import React from 'react';
+import { View, Image, Text, Pressable } from 'react-native';
+import { MorphCardSource, MorphCardTarget, useMorphTarget } from 'react-native-morph-card';
+
+// ── List screen ──
+const ListScreen = ({ navigation }) => {
   return (
-    <MorphCardSource style={styles.card}>
-      <Pressable onPress={() => console.log('Morph!')}>
-        <Text>Tap me</Text>
-      </Pressable>
+    <MorphCardSource
+      width={200}
+      height={150}
+      borderRadius={16}
+      expandDuration={350}
+      onPress={(sourceTag) => navigation.navigate('Detail', { sourceTag })}
+    >
+      <Image source={albumArt} style={{ width: 200, height: 150 }} />
     </MorphCardSource>
   );
-}
+};
+
+// ── Detail screen ──
+const DetailScreen = ({ route, navigation }) => {
+  const { dismiss } = useMorphTarget({
+    sourceTag: route.params.sourceTag,
+    navigation,
+  });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <MorphCardTarget
+        sourceTag={route.params.sourceTag}
+        width={'100%'}
+        height={300}
+        collapseDuration={200}
+        borderRadius={0}
+      />
+      <Pressable onPress={dismiss}>
+        <Text>Close</Text>
+      </Pressable>
+    </View>
+  );
+};
+```
+
+## API
+
+### `<MorphCardSource>`
+
+Wraps the card content on the list/grid screen. Captures a snapshot and drives the expand animation.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `DimensionValue` | — | Card width |
+| `height` | `DimensionValue` | — | Card height |
+| `borderRadius` | `number` | `0` | Corner radius of the card |
+| `backgroundColor` | `string` | — | Background color (enables "wrapper mode" where the background expands separately from the content) |
+| `duration` | `number` | `300` | Default animation duration in ms (used for both expand and collapse if specific durations are not set) |
+| `expandDuration` | `number` | — | Duration of the expand animation in ms. Overrides `duration` for expand. |
+| `scaleMode` | `'aspectFill' \| 'aspectFit' \| 'stretch'` | `'aspectFill'` | How the snapshot scales during no-wrapper mode animation |
+| `onPress` | `(sourceTag: number) => void` | — | Called on tap with the native view tag. Use this to navigate to the detail screen. |
+
+### `<MorphCardTarget>`
+
+Placed on the detail screen where the card should land. Triggers the expand animation on mount.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `sourceTag` | `number` | **required** | The source view tag from navigation params |
+| `width` | `DimensionValue` | source width | Target width after expand |
+| `height` | `DimensionValue` | source height | Target height after expand |
+| `borderRadius` | `number` | source radius | Target corner radius. Set to `0` for no rounding. |
+| `collapseDuration` | `number` | — | Duration of the collapse animation in ms. Falls back to the source's `duration`. |
+| `contentOffsetY` | `number` | `0` | Vertical offset for content snapshot in wrapper mode |
+| `contentCentered` | `boolean` | `false` | Center content snapshot horizontally in wrapper mode |
+
+### `useMorphTarget(options)`
+
+Hook that provides a `dismiss` function for collapsing back to the source card. The `navigation` object must support `goBack()` — works with React Navigation, expo-router, or any navigator that implements it.
+
+```tsx
+const { dismiss } = useMorphTarget({
+  sourceTag: route.params.sourceTag,
+  navigation,
+});
+```
+
+> **Note:** The detail screen should be presented as a modal (e.g. `transparentModal` or `fullScreenModal` in React Navigation) so the source screen remains mounted underneath during the animation.
+
+### Imperative API
+
+For more control, use the imperative functions:
+
+```tsx
+import { morphExpand, morphCollapse, getViewTag } from 'react-native-morph-card';
+
+// Expand from source to target
+await morphExpand(sourceRef, targetRef);
+
+// Collapse back (pass the sourceTag)
+await morphCollapse(sourceTag);
+
+// Get the native view tag from a ref
+const tag = getViewTag(viewRef);
+```
 ```
 
 ## Running the example app

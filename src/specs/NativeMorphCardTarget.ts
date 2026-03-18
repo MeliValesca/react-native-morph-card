@@ -21,6 +21,9 @@ export interface NativeMorphCardTargetProps extends ViewProps {
    */
   sourceTag?: Int32;
 
+  /** Duration of the collapse animation in ms. Falls back to source's duration. */
+  collapseDuration?: Double;
+
   onMorphComplete?: DirectEventHandler<MorphCompleteEvent>;
 
   /** Explicit target width. 0 = use source width. */
