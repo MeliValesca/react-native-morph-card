@@ -28,7 +28,7 @@ export default function AppStoreDetailScreen({ route, navigation }: Props) {
           backgroundColor: '#fff',
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          marginTop: -20,
+          marginTop: -5,
         }}
         contentContainerStyle={{ padding: 24, paddingTop: 32 }}
       >

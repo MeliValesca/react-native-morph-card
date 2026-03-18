@@ -14,6 +14,7 @@
     "ios": ["dist/assets", "dist/main.ios.jsbundle"]
   },
   "ios": {
+    "bundleIdentifier": "com.melivalesca.morphcard.example",
     "plist": {
       "NSAppTransportSecurity": {
         "NSAllowsArbitraryLoads": true

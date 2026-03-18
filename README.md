@@ -2,6 +2,8 @@
 
 Native card-to-modal morph transition for React Native. Smoothly animates a card from a list into a fullscreen detail view, morphing size, position, and corner radius — then collapses back.
 
+https://github.com/user-attachments/assets/93f0c1f6-e203-496e-bb56-c994e1500e32
+
 - Native animations on both platforms (UIKit `UIViewPropertyAnimator` / Android `ValueAnimator`)
 - No JS-driven animation, no webview, no experimental flags
 - Works with any navigation setup (React Navigation, expo-router, etc.)
@@ -18,6 +20,7 @@ Native card-to-modal morph transition for React Native. Smoothly animates a card
   - [Imperative API](#imperative-api)
 - [Running the Example App](#running-the-example-app)
 - [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
 - [License](#license)
 
 ## Installation
@@ -130,7 +133,7 @@ const { dismiss } = useMorphTarget({
 });
 ```
 
-> **Note:** The detail screen should be presented as a modal (e.g. `transparentModal` or `fullScreenModal` in React Navigation) so the source screen remains mounted underneath during the animation.
+> **Note:** The detail screen should be presented as a modal (e.g. `transparentModal` or `fullScreenModal` in React Navigation) so the source screen remains mounted underneath during the animation. Make sure to disable any built-in navigation transitions (e.g. `animation: 'none'` in React Navigation) — the morph animation replaces the screen transition entirely, and combining both will look broken.
 
 ### Imperative API
 
@@ -237,6 +240,13 @@ yarn build:android
 | Android build fails on first run | Make sure `ANDROID_HOME` is set and an emulator/device is available |
 | Metro can't find `react-native-morph-card` | Run `yarn install` at the repo root first |
 | Duplicate module errors | Delete `node_modules` in both root and `example/`, then reinstall |
+
+## Roadmap
+
+- Support for more screen presentation styles (e.g. iOS modal sheet, page sheet)
+- Shared element transitions between arbitrary views
+- Gesture-driven collapse (drag to dismiss)
+- Spring physics configuration props
 
 ## License
 

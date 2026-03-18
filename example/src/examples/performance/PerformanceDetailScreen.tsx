@@ -15,12 +15,15 @@ export default function PerformanceDetailScreen({ route, navigation }: Props) {
   });
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}>
+    <View
+      style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center' }}
+    >
       <MorphCardTarget
         sourceTag={route.params.sourceTag}
         width={SCREEN_WIDTH}
         height={SCREEN_WIDTH}
         borderRadius={0}
+        collapseDuration={200}
       />
 
       <Pressable
