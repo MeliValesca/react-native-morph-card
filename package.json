@@ -1,6 +1,6 @@
 {
   "name": "react-native-morph-card",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Native card-to-modal morph transition for React Native. iOS App Store-style expand animation.",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",

@@ -20,6 +20,7 @@ https://github.com/user-attachments/assets/93f0c1f6-e203-496e-bb56-c994e1500e32
   - [Imperative API](#imperative-api)
 - [Running the Example App](#running-the-example-app)
 - [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -240,6 +241,10 @@ yarn build:android
 | Android build fails on first run | Make sure `ANDROID_HOME` is set and an emulator/device is available |
 | Metro can't find `react-native-morph-card` | Run `yarn install` at the repo root first |
 | Duplicate module errors | Delete `node_modules` in both root and `example/`, then reinstall |
+
+## Contributing
+
+Contributions are welcome! If you find a bug or have a feature request, please open an issue. Pull requests are appreciated — just make sure to open an issue first so we can discuss the approach.
 
 ## Roadmap
 
