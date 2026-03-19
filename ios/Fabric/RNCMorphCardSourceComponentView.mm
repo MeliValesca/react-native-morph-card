@@ -459,9 +459,11 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   UIView *targetScreen = _targetScreenContainer;
   UIView *sourceScreen = _sourceScreenContainer;
 
-  // Clear the snapshot from the target view before re-creating the overlay
+  // Clear the snapshot and hide the target view so live children
+  // don't show behind the animating collapse overlay
   if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
     [(RNCMorphCardTargetComponentView *)targetView clearSnapshot];
+    targetView.hidden = YES;
   }
 
   CGFloat collapseDur = 0;

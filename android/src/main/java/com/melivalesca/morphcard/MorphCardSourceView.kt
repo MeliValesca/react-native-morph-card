@@ -728,8 +728,10 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       val cardImage = captureSnapshot()
       alpha = 0f
 
-      // Clear the snapshot from the target view
+      // Clear the snapshot and hide the target view so live children
+      // don't show behind the animating collapse overlay
       target?.clearSnapshot()
+      targetView?.visibility = View.INVISIBLE
 
       wrapper = FrameLayout(context)
       wrapper.layoutParams = FrameLayout.LayoutParams(twPx.toInt(), thPx.toInt())

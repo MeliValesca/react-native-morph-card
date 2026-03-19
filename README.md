@@ -46,7 +46,7 @@ No additional steps required.
 
 Wrap your card content in `MorphCardSource`. On the detail screen, use `MorphCardTarget` where the card should land. Use `useMorphTarget` for easy collapse handling.
 
-> **Important:** `MorphCardSource` can wrap any React Native component (images, views, text, etc.), but during the animation the content is captured as a **bitmap snapshot**. This means dynamic or observable values (timers, animated values, live data) will freeze at the moment of capture. Design your card content with this in mind.
+> **Important:** `MorphCardSource` can wrap any React Native component (images, views, text, etc.). During the animation, the content is captured as a **bitmap snapshot** — but once the animation completes, the snapshot fades out and the source's children are automatically cloned into `MorphCardTarget` as live React components. The cloned children are rendered at the source card's original layout dimensions, so your component layout stays consistent. This means observable values (timers, animated values, live data) will update in real time after the transition finishes. If you use `resizeMode`, the bitmap is kept instead (native image scaling doesn't apply to React components).
 
 ```tsx
 import React from 'react';
@@ -110,12 +110,12 @@ Wraps the card content on the list/grid screen. Captures a snapshot and drives t
 | `backgroundColor` | `string`                                   | —              | Background color (enables "wrapper mode" where the background expands separately from the content)     |
 | `duration`        | `number`                                   | `300`          | Default animation duration in ms (used for both expand and collapse if specific durations are not set) |
 | `expandDuration`  | `number`                                   | —              | Duration of the expand animation in ms. Overrides `duration` for expand.                               |
-| `scaleMode`       | `'aspectFill' \| 'aspectFit' \| 'stretch'` | `'aspectFill'` | How the snapshot scales during no-wrapper mode animation                                               |
+| `resizeMode`      | `'cover' \| 'contain' \| 'stretch'`        | `'cover'`      | How the snapshot scales during animation. When set, the bitmap is kept after expand (no live children). **Recommended when wrapping an `<Image>` — without it, the image may not scale properly during the animation.** |
 | `onPress`         | `(sourceTag: number) => void`              | —              | Called on tap with the native view tag. Use this to navigate to the detail screen.                     |
 
 ### `<MorphCardTarget>`
 
-Placed on the detail screen where the card should land. Triggers the expand animation on mount.
+Placed on the detail screen where the card should land. Triggers the expand animation on mount. After the animation, the source's children are automatically cloned here as live React components.
 
 | Prop               | Type             | Default       | Description                                                                      |
 | ------------------ | ---------------- | ------------- | -------------------------------------------------------------------------------- |
@@ -161,7 +161,7 @@ await morphCollapse(sourceTag);
 const tag = getViewTag(viewRef);
 ```
 
-````
+```
 
 ## Running the example app
 
