@@ -10,8 +10,8 @@ import GalleryScreen from './examples/gallery/GalleryScreen';
 import GalleryDetailScreen from './examples/gallery/GalleryDetailScreen';
 import ProfileScreen from './examples/profile/ProfileScreen';
 import ProfileDetailScreen from './examples/profile/ProfileDetailScreen';
-import ScaleModesScreen from './examples/scalemodes/ScaleModesScreen';
-import ScaleModesDetailScreen from './examples/scalemodes/ScaleModesDetailScreen';
+import ResizeModesScreen from './examples/resizemodes/ResizeModesScreen';
+import ResizeModesDetailScreen from './examples/resizemodes/ResizeModesDetailScreen';
 import MixedScreen from './examples/mixed/MixedScreen';
 import MixedDetailScreen from './examples/mixed/MixedDetailScreen';
 import PerformanceScreen from './examples/performance/PerformanceScreen';
@@ -30,8 +30,8 @@ export type RootStackParamList = {
   GalleryDetail: { sourceTag: number };
   Profile: undefined;
   ProfileDetail: { sourceTag: number; user: { name: string; handle: string; avatarIndex: number; bio: string; followers: string; following: string; posts: string } };
-  ScaleModes: undefined;
-  ScaleModesDetail: { sourceTag: number; mode: string };
+  ResizeModes: undefined;
+  ResizeModesDetail: { sourceTag: number; mode: string };
   Mixed: undefined;
   MixedDetail: { sourceTag: number; card: { id: string; type: string; title: string; subtitle: string; bg?: string } };
   Performance: undefined;
@@ -99,13 +99,13 @@ export default function App() {
           options={morphModal}
         />
         <Stack.Screen
-          name="ScaleModes"
-          component={ScaleModesScreen}
-          options={{ title: 'Scale Modes' }}
+          name="ResizeModes"
+          component={ResizeModesScreen}
+          options={{ title: 'Resize Modes' }}
         />
         <Stack.Screen
-          name="ScaleModesDetail"
-          component={ScaleModesDetailScreen}
+          name="ResizeModesDetail"
+          component={ResizeModesDetailScreen}
           options={morphModal}
         />
         <Stack.Screen

@@ -7,7 +7,7 @@ import type { ResizeMode } from 'react-native-morph-card';
 import type { RootStackParamList } from '../../App';
 import { landscapes } from '../../assets';
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'ScaleModes'>;
+type Nav = NativeStackNavigationProp<RootStackParamList, 'ResizeModes'>;
 
 const modes: { mode: ResizeMode; label: string; description: string }[] = [
   { mode: 'cover', label: 'Cover', description: 'Fills target, crops excess' },
@@ -15,7 +15,7 @@ const modes: { mode: ResizeMode; label: string; description: string }[] = [
   { mode: 'stretch', label: 'Stretch', description: 'Stretches to fill exactly' },
 ];
 
-export default function ScaleModesScreen() {
+export default function ResizeModesScreen() {
   const navigation = useNavigation<Nav>();
 
   return (
@@ -37,7 +37,7 @@ export default function ScaleModesScreen() {
             borderRadius={16}
             height={180}
             onPress={(sourceTag: number) =>
-              navigation.navigate('ScaleModesDetail', { sourceTag, mode: item.mode })
+              navigation.navigate('ResizeModesDetail', { sourceTag, mode: item.mode })
             }
           >
             <Image

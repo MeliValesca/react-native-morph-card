@@ -36,8 +36,8 @@ const examples = [
     color: '#34C759',
   },
   {
-    key: 'ScaleModes' as const,
-    title: 'Scale Modes',
+    key: 'ResizeModes' as const,
+    title: 'Resize Modes',
     subtitle: 'Compare aspectFill, aspectFit, and stretch',
     tags: ['no-wrapper mode', 'resizeMode comparison', 'cover', 'contain', 'stretch'],
     color: '#FF2D55',

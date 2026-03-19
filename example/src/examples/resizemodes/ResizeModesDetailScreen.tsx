@@ -6,9 +6,9 @@ import type { RootStackParamList } from '../../App';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-type Props = NativeStackScreenProps<RootStackParamList, 'ScaleModesDetail'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'ResizeModesDetail'>;
 
-export default function ScaleModesDetailScreen({ route, navigation }: Props) {
+export default function ResizeModesDetailScreen({ route, navigation }: Props) {
   const { dismiss } = useMorphTarget({
     sourceTag: route.params.sourceTag,
     navigation,
