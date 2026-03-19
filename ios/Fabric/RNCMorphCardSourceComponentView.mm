@@ -92,6 +92,8 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   __weak UIView *_targetView;
   __weak UIView *_sourceScreenContainer;
   __weak UIView *_targetScreenContainer;
+  CGFloat _rotations;
+  CGFloat _rotationEndAngle;
   UIView *_wrapperView;
   UIImageView *_snapshot;
 }
@@ -124,6 +126,8 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   } else {
     _scaleMode = UIViewContentModeScaleAspectFill;
   }
+  _rotations = newProps.rotations;
+  _rotationEndAngle = newProps.rotationEndAngle;
   [super updateProps:props oldProps:oldProps];
 }
 
@@ -293,16 +297,36 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
         ? (targetFrame.size.height - contentSize.height) / 2.0
         : contentOffsetY;
 
+    // Use bounds/center instead of frame so rotation transforms work correctly
+    CGFloat totalAngleDeg = _rotations * 360.0 + _rotationEndAngle;
+    CGFloat totalAngleRad = totalAngleDeg * M_PI / 180.0;
+    wrapper.bounds = CGRectMake(0, 0, _cardFrame.size.width, _cardFrame.size.height);
+    wrapper.center = CGPointMake(CGRectGetMidX(_cardFrame), CGRectGetMidY(_cardFrame));
+
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
             dampingRatio:0.85
               animations:^{
-                wrapper.frame = targetFrame;
+                wrapper.bounds = CGRectMake(0, 0, targetFrame.size.width, targetFrame.size.height);
+                wrapper.center = CGPointMake(CGRectGetMidX(targetFrame), CGRectGetMidY(targetFrame));
                 wrapper.layer.cornerRadius = targetCornerRadius;
                 content.frame = CGRectMake(targetCx, targetCy,
                                            contentSize.width,
                                            contentSize.height);
               }];
+
+    // Use CABasicAnimation for rotation — UIViewPropertyAnimator takes the
+    // shortest path and can't do multiple full spins.
+    if (totalAngleRad != 0) {
+      CABasicAnimation *rotAnim = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+      rotAnim.fromValue = @(0);
+      rotAnim.toValue = @(totalAngleRad);
+      rotAnim.duration = dur;
+      rotAnim.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.25 :1.0 :0.5 :1.0];
+      rotAnim.fillMode = kCAFillModeForwards;
+      rotAnim.removedOnCompletion = NO;
+      [wrapper.layer addAnimation:rotAnim forKey:@"morphRotation"];
+    }
 
     // Hide the target view itself so it doesn't double-render over the morph overlay.
     if (targetView) {
@@ -345,7 +369,13 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
               [target fadeOutSnapshot];
             });
       }
-      if (targetView) { targetView.hidden = NO; }
+      if (targetView) {
+        targetView.hidden = NO;
+        CGFloat endAngleRad = self->_rotationEndAngle * M_PI / 180.0;
+        if (endAngleRad != 0) {
+          targetView.transform = CGAffineTransformMakeRotation(endAngleRad);
+        }
+      }
       self.alpha = 1;
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
@@ -363,7 +393,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     UIViewContentMode scaleMode = _scaleMode;
     CGSize imageSize = cardImage.size;
 
-    UIView *container = [[UIView alloc] initWithFrame:_cardFrame];
+    UIView *container = [[UIView alloc] initWithFrame:CGRectZero];
+    container.bounds = CGRectMake(0, 0, _cardFrame.size.width, _cardFrame.size.height);
+    container.center = CGPointMake(CGRectGetMidX(_cardFrame), CGRectGetMidY(_cardFrame));
     container.clipsToBounds = YES;
     container.layer.cornerRadius = _cardCornerRadius;
 
@@ -388,14 +420,30 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     CGRect targetImageFrame = imageFrameForScaleMode(
         scaleMode, imageSize, targetFrame.size);
 
+    CGFloat totalAngleDegNoWrap = _rotations * 360.0 + _rotationEndAngle;
+    CGFloat totalAngleRadNoWrap = totalAngleDegNoWrap * M_PI / 180.0;
+
     UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
         initWithDuration:dur
             dampingRatio:0.85
               animations:^{
-                container.frame = targetFrame;
+                container.bounds = CGRectMake(0, 0, targetFrame.size.width, targetFrame.size.height);
+                container.center = CGPointMake(CGRectGetMidX(targetFrame), CGRectGetMidY(targetFrame));
                 container.layer.cornerRadius = targetCornerRadius;
                 snapshot.frame = targetImageFrame;
               }];
+
+    // Use CABasicAnimation for rotation — supports multiple full spins
+    if (totalAngleRadNoWrap != 0) {
+      CABasicAnimation *rotAnim = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+      rotAnim.fromValue = @(0);
+      rotAnim.toValue = @(totalAngleRadNoWrap);
+      rotAnim.duration = dur;
+      rotAnim.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.25 :1.0 :0.5 :1.0];
+      rotAnim.fillMode = kCAFillModeForwards;
+      rotAnim.removedOnCompletion = NO;
+      [container.layer addAnimation:rotAnim forKey:@"morphRotation"];
+    }
 
     // Start fading in screen content early (at 15% of the animation).
     __weak RNCMorphCardSourceComponentView *weakSelf2 = self;
@@ -427,7 +475,13 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
               [target fadeOutSnapshot];
             });
       }
-      if (targetView) { targetView.hidden = NO; }
+      if (targetView) {
+        targetView.hidden = NO;
+        CGFloat endAngleRad = self->_rotationEndAngle * M_PI / 180.0;
+        if (endAngleRad != 0) {
+          targetView.transform = CGAffineTransformMakeRotation(endAngleRad);
+        }
+      }
       self.alpha = 1;
       UIView *ts = self->_targetScreenContainer;
       if (ts) { ts.alpha = 1; }
@@ -464,6 +518,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   if (targetView && [targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
     [(RNCMorphCardTargetComponentView *)targetView clearSnapshot];
     targetView.hidden = YES;
+    targetView.transform = CGAffineTransformIdentity;
   }
 
   CGFloat collapseDur = 0;
@@ -493,7 +548,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
           ? (targetFrame.size.height - contentSize.height) / 2.0
           : contentOffsetY;
 
-      wrapper = [[UIView alloc] initWithFrame:targetFrame];
+      wrapper = [[UIView alloc] initWithFrame:CGRectZero];
+      wrapper.bounds = CGRectMake(0, 0, targetFrame.size.width, targetFrame.size.height);
+      wrapper.center = CGPointMake(CGRectGetMidX(targetFrame), CGRectGetMidY(targetFrame));
       wrapper.backgroundColor = self.backgroundColor;
       wrapper.layer.cornerRadius = targetCornerRadius;
       wrapper.clipsToBounds = YES;
@@ -522,12 +579,26 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
         initWithDuration:dur
         timingParameters:timing];
     [animator addAnimations:^{
-      wrapper.frame = self->_cardFrame;
+      wrapper.bounds = CGRectMake(0, 0, self->_cardFrame.size.width, self->_cardFrame.size.height);
+      wrapper.center = CGPointMake(CGRectGetMidX(self->_cardFrame), CGRectGetMidY(self->_cardFrame));
       wrapper.layer.cornerRadius = self->_cardCornerRadius;
       if (content) {
         content.frame = (CGRect){CGPointZero, content.frame.size};
       }
     }];
+
+    // Animate rotation back to 0
+    CGFloat collapseStartAngle = _rotationEndAngle * M_PI / 180.0;
+    if (collapseStartAngle != 0) {
+      CABasicAnimation *rotAnim = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+      rotAnim.fromValue = @(collapseStartAngle);
+      rotAnim.toValue = @(0);
+      rotAnim.duration = dur;
+      rotAnim.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.25 :1.0 :0.5 :1.0];
+      rotAnim.fillMode = kCAFillModeForwards;
+      rotAnim.removedOnCompletion = NO;
+      [wrapper.layer addAnimation:rotAnim forKey:@"morphRotation"];
+    }
 
     // Fade out target screen
     [self scheduleScreenFadeOut:targetScreen duration:dur];
@@ -556,7 +627,9 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       CGRect imageFrame = imageFrameForScaleMode(
           _scaleMode, imageSize, targetFrame.size);
 
-      container = [[UIView alloc] initWithFrame:targetFrame];
+      container = [[UIView alloc] initWithFrame:CGRectZero];
+      container.bounds = CGRectMake(0, 0, targetFrame.size.width, targetFrame.size.height);
+      container.center = CGPointMake(CGRectGetMidX(targetFrame), CGRectGetMidY(targetFrame));
       container.clipsToBounds = YES;
       container.layer.cornerRadius = targetCornerRadius;
 
@@ -582,10 +655,24 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
         initWithDuration:dur
         timingParameters:timing];
     [animator addAnimations:^{
-      container.frame = self->_cardFrame;
+      container.bounds = CGRectMake(0, 0, self->_cardFrame.size.width, self->_cardFrame.size.height);
+      container.center = CGPointMake(CGRectGetMidX(self->_cardFrame), CGRectGetMidY(self->_cardFrame));
       container.layer.cornerRadius = self->_cardCornerRadius;
       snapshot.frame = (CGRect){CGPointZero, self->_cardFrame.size};
     }];
+
+    // Animate rotation back to 0
+    CGFloat collapseStartAngleNW = _rotationEndAngle * M_PI / 180.0;
+    if (collapseStartAngleNW != 0) {
+      CABasicAnimation *rotAnim = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+      rotAnim.fromValue = @(collapseStartAngleNW);
+      rotAnim.toValue = @(0);
+      rotAnim.duration = dur;
+      rotAnim.timingFunction = [CAMediaTimingFunction functionWithControlPoints:0.25 :1.0 :0.5 :1.0];
+      rotAnim.fillMode = kCAFillModeForwards;
+      rotAnim.removedOnCompletion = NO;
+      [container.layer addAnimation:rotAnim forKey:@"morphRotation"];
+    }
 
     // Fade out target screen
     [self scheduleScreenFadeOut:targetScreen duration:dur];

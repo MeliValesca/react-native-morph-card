@@ -14,6 +14,8 @@ export interface NativeMorphCardSourceProps extends ViewProps {
   expandDuration?: Double;
   scaleMode?: WithDefault<'aspectFill' | 'aspectFit' | 'stretch', 'aspectFill'>;
   cardBorderRadius?: Double;
+  rotations?: Double;
+  rotationEndAngle?: Double;
 }
 
 export default codegenNativeComponent<NativeMorphCardSourceProps>(

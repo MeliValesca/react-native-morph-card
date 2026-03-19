@@ -40,6 +40,8 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
         screenContainer.visibility = View.INVISIBLE
         Log.d(TAG, "TargetView: set screen INVISIBLE")
       }
+      // Hide children until snapshot is in place to avoid flash of un-rotated content
+      hideChildren()
     }
   }
 
@@ -118,6 +120,18 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     invalidate()
   }
 
+  fun showChildren() {
+    for (i in 0 until childCount) {
+      getChildAt(i).alpha = 1f
+    }
+  }
+
+  fun hideChildren() {
+    for (i in 0 until childCount) {
+      getChildAt(i).alpha = 0f
+    }
+  }
+
   fun fadeOutSnapshot() {
     if (snapshotBitmap == null) return
     // Only fade out if there are React children underneath to reveal.
@@ -129,6 +143,8 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
       snapshotAlpha = it.animatedValue as Float
       invalidate()
     }
+    // Show children before snapshot fades so they're visible underneath
+    showChildren()
     anim.addListener(object : android.animation.AnimatorListenerAdapter() {
       override fun onAnimationEnd(animation: android.animation.Animator) {
         clearSnapshot()

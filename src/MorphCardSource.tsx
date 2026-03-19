@@ -25,6 +25,10 @@ export interface MorphCardSourceProps {
   backgroundColor?: string;
   /** How the snapshot scales in no-wrapper mode (no backgroundColor). Default: 'cover' */
   resizeMode?: ResizeMode;
+  /** Number of full 360° rotations during expand animation. Default: 0 */
+  rotations?: number;
+  /** Final rotation angle in degrees after expand. Default: 0 */
+  rotationEndAngle?: number;
   onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
 }
@@ -38,6 +42,8 @@ export const MorphCardSource = ({
   borderRadius,
   backgroundColor,
   resizeMode,
+  rotations,
+  rotationEndAngle,
   onPress,
   ref,
 }: MorphCardSourceProps) => {
@@ -85,7 +91,7 @@ export const MorphCardSource = ({
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={resizeMode === 'contain' ? 'aspectFit' : resizeMode === 'stretch' ? 'stretch' : 'aspectFill'} cardBorderRadius={borderRadius} style={style} onLayout={handleLayout}>
+    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={resizeMode === 'contain' ? 'aspectFit' : resizeMode === 'stretch' ? 'stretch' : 'aspectFill'} cardBorderRadius={borderRadius} rotations={rotations} rotationEndAngle={rotationEndAngle} style={style} onLayout={handleLayout}>
       {children}
     </NativeSourceView>
   );

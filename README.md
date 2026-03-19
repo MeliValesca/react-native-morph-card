@@ -111,6 +111,8 @@ Wraps the card content on the list/grid screen. Captures a snapshot and drives t
 | `duration`        | `number`                                   | `300`          | Default animation duration in ms (used for both expand and collapse if specific durations are not set) |
 | `expandDuration`  | `number`                                   | —              | Duration of the expand animation in ms. Overrides `duration` for expand.                               |
 | `resizeMode`      | `'cover' \| 'contain' \| 'stretch'`        | `'cover'`      | How the snapshot scales during animation. When set, the bitmap is kept after expand (no live children). **Recommended when wrapping an `<Image>` — without it, the image may not scale properly during the animation.** |
+| `rotations`       | `number`                                   | `0`            | Number of full 360° rotations during the expand animation                                              |
+| `rotationEndAngle`| `number`                                   | `0`            | Final rotation angle in degrees after expand (e.g. `45` to end tilted). Collapse reverses it back to 0 |
 | `onPress`         | `(sourceTag: number) => void`              | —              | Called on tap with the native view tag. Use this to navigate to the detail screen.                     |
 
 ### `<MorphCardTarget>`

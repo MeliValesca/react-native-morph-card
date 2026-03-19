@@ -33,6 +33,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
   var expandDuration: Double = 0.0
   var scaleMode: String = "aspectFill"
   var borderRadiusDp: Float = 0f
+  var rotations: Double = 0.0
+  var rotationEndAngle: Double = 0.0
 
   // ── Target config (set by module, in dp from JS) ──
   var pendingTargetWidth: Float = 0f
@@ -527,6 +529,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       imageFrameForScaleMode(scaleMode, cardWidth, cardHeight, targetWidthPx, targetHeightPx)
     } else null
 
+    val totalAngle = (rotations * 360.0 + rotationEndAngle).toFloat()
+
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = dur
     animator.interpolator = springInterpolator
@@ -541,6 +545,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       lp.height = lerp(cardHeight, targetHeightPx, t).toInt()
       cardWrapper.layoutParams = lp
       setRoundedCorners(cardWrapper, lerp(cardCornerRadiusPx, targetCornerRadiusPx, t))
+      cardWrapper.rotation = lerp(0f, totalAngle, t)
 
       if (content != null) {
         if (hasWrapper) {
@@ -590,6 +595,11 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
           it.alpha = 1f
         }
         this@MorphCardSourceView.alpha = 1f
+
+        // Apply end rotation to target view
+        if (rotationEndAngle != 0.0) {
+          targetView?.rotation = rotationEndAngle.toFloat()
+        }
 
         transferSnapshotToTarget(decorView, wrapper, targetView,
           targetWidthPx, targetHeightPx, targetCornerRadiusPx, 200L)
@@ -718,6 +728,7 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     var wrapper = overlayContainer
     if (wrapper == null) {
       val target = targetView as? MorphCardTargetView
+      // Read position BEFORE clearing rotation — visual position depends on rotation
       val targetLoc = if (targetView != null) getLocationInWindow(targetView) else intArrayOf(cardLeft.toInt(), cardTop.toInt())
       val twPx = if (pendingTargetWidth > 0) pendingTargetWidth * d else cardWidth
       val thPx = if (pendingTargetHeight > 0) pendingTargetHeight * d else cardHeight
@@ -728,13 +739,15 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       val cardImage = captureSnapshot()
       alpha = 0f
 
-      // Clear the snapshot and hide the target view so live children
-      // don't show behind the animating collapse overlay
+      // Clear the snapshot from the target
       target?.clearSnapshot()
-      targetView?.visibility = View.INVISIBLE
+
+      // Use target view's actual size if available for exact match
+      val wrapW = if (targetView != null && targetView.width > 0) targetView.width.toFloat() else twPx
+      val wrapH = if (targetView != null && targetView.height > 0) targetView.height.toFloat() else thPx
 
       wrapper = FrameLayout(context)
-      wrapper.layoutParams = FrameLayout.LayoutParams(twPx.toInt(), thPx.toInt())
+      wrapper.layoutParams = FrameLayout.LayoutParams(wrapW.toInt(), wrapH.toInt())
       wrapper.x = targetLoc[0].toFloat()
       wrapper.y = targetLoc[1].toFloat()
       wrapper.clipChildren = true
@@ -764,8 +777,23 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       }
 
       wrapper.addView(content)
+      wrapper.translationZ = 1000f
+
+      // Match the target's exact rotation center by reading its actual size
+      val actualW = targetView?.width?.toFloat() ?: wrapW
+      val actualH = targetView?.height?.toFloat() ?: wrapH
+      // Clear target rotation first so getLocationInWindow gives un-rotated pos
+      // then position wrapper at same un-rotated pos with same rotation
+      targetView?.rotation = 0f
+      val unrotatedLoc = if (targetView != null) getLocationInWindow(targetView) else targetLoc
+      wrapper.x = unrotatedLoc[0].toFloat()
+      wrapper.y = unrotatedLoc[1].toFloat()
+      wrapper.layoutParams = FrameLayout.LayoutParams(actualW.toInt(), actualH.toInt())
+      wrapper.rotation = rotationEndAngle.toFloat()
+
       decorView.addView(wrapper)
       overlayContainer = wrapper
+      targetView?.visibility = View.INVISIBLE
     }
 
     // Show source screen underneath
@@ -786,9 +814,18 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     val startImgW = content?.layoutParams?.width?.toFloat() ?: cardWidth
     val startImgH = content?.layoutParams?.height?.toFloat() ?: cardHeight
 
+    // Lock pivot to center so rotation stays stable as size changes
+    if (rotationEndAngle != 0.0) {
+      wrapper.pivotX = startWidth / 2f
+      wrapper.pivotY = startHeight / 2f
+    }
+
+    // Match iOS collapse curve: cubic bezier (0.25, 1.0, 0.5, 1.0)
+    val collapseInterpolator = PathInterpolator(0.25f, 1.0f, 0.5f, 1.0f)
+
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = dur
-    animator.interpolator = springInterpolator
+    animator.interpolator = collapseInterpolator
 
     animator.addUpdateListener { anim ->
       val t = anim.animatedValue as Float
@@ -799,6 +836,11 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
       lp.height = lerp(startHeight, cardHeight, t).toInt()
       wrapper.layoutParams = lp
       setRoundedCorners(wrapper, lerp(startCr, cardCornerRadiusPx, t))
+      if (rotationEndAngle != 0.0) {
+        wrapper.rotation = lerp(rotationEndAngle.toFloat(), 0f, t)
+        wrapper.pivotX = lp.width / 2f
+        wrapper.pivotY = lp.height / 2f
+      }
 
       if (content != null) {
         if (hasWrapper) {

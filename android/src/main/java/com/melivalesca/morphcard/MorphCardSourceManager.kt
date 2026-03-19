@@ -38,6 +38,14 @@ class MorphCardSourceManager :
     view.borderRadiusDp = value.toFloat()
   }
 
+  override fun setRotations(view: MorphCardSourceView, value: Double) {
+    view.rotations = value
+  }
+
+  override fun setRotationEndAngle(view: MorphCardSourceView, value: Double) {
+    view.rotationEndAngle = value
+  }
+
   companion object {
     const val REACT_CLASS = "RNCMorphCardSource"
   }
