@@ -14,6 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
                frame:(CGRect)frame
         cornerRadius:(CGFloat)cornerRadius
      backgroundColor:(nullable UIColor *)bgColor;
+- (void)fadeOutSnapshot;
 - (void)clearSnapshot;
 
 @end

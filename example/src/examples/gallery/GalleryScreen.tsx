@@ -24,7 +24,7 @@ export default function GalleryScreen() {
         return (
           <View key={index} style={{ width, height, padding: 1 }}>
             <MorphCardSource
-              scaleMode="aspectFit"
+              resizeMode="contain"
               borderRadius={0}
               expandDuration={450}
               onPress={(sourceTag: number) =>

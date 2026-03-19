@@ -338,6 +338,12 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
                   cornerRadius:targetCornerRadius
                backgroundColor:wrapperBg];
         }
+        // Crossfade snapshot out to reveal live React children underneath
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              [target fadeOutSnapshot];
+            });
       }
       if (targetView) { targetView.hidden = NO; }
       self.alpha = 1;
@@ -414,6 +420,12 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
                        frame:target.bounds
                 cornerRadius:targetCornerRadius
              backgroundColor:nil];
+        // Crossfade snapshot out to reveal live React children underneath
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              [target fadeOutSnapshot];
+            });
       }
       if (targetView) { targetView.hidden = NO; }
       self.alpha = 1;

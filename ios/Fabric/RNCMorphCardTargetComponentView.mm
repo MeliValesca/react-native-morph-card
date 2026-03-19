@@ -72,6 +72,27 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
   _snapshotContainer = container;
 }
 
+- (void)fadeOutSnapshot {
+  UIView *snap = _snapshotContainer;
+  if (!snap) return;
+  // Only fade out if there are React children underneath to reveal.
+  // If no children (scaleMode bitmap-only), keep the snapshot.
+  BOOL hasReactChildren = NO;
+  for (UIView *child in self.subviews) {
+    if (child != _snapshotContainer) { hasReactChildren = YES; break; }
+  }
+  if (!hasReactChildren) return;
+
+  [UIView animateWithDuration:0.15
+      animations:^{ snap.alpha = 0; }
+      completion:^(BOOL finished) {
+        [snap removeFromSuperview];
+        if (self->_snapshotContainer == snap) {
+          self->_snapshotContainer = nil;
+        }
+      }];
+}
+
 - (void)clearSnapshot {
   if (_snapshotContainer) {
     [_snapshotContainer removeFromSuperview];

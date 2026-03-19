@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
 import NativeTargetViewSpec from './specs/NativeMorphCardTarget';
+import { getSourceEntry } from './MorphChildrenRegistry';
 
 const NativeTargetView = NativeTargetViewSpec ?? View;
 
@@ -77,23 +78,42 @@ export const MorphCardTarget = ({
         lh,
         borderRadius != null ? borderRadius : -1,
         contentOffsetY ?? 0,
-        contentCentered ?? false
+        contentCentered ?? false,
       );
       NativeMorphCardModule.expand(sourceTag, targetTag);
     },
-    [sourceTag, borderRadius, contentOffsetY, contentCentered]
+    [sourceTag, borderRadius, contentOffsetY, contentCentered],
   );
 
-  const sizeStyle: ViewStyle = {};
+  const sourceEntry = getSourceEntry(sourceTag);
+
+  const containerStyle: ViewStyle = {
+    overflow: 'hidden',
+  };
+  if (sourceEntry?.backgroundColor) {
+    containerStyle.backgroundColor = sourceEntry.backgroundColor;
+  }
+  if (contentCentered) {
+    containerStyle.justifyContent = 'center';
+    containerStyle.alignItems = 'center';
+  }
+  if (contentOffsetY) {
+    containerStyle.paddingTop = contentOffsetY;
+  }
+
   if (width != null) {
-    sizeStyle.width = width;
+    containerStyle.width = width;
   } else if (sourceSize) {
-    sizeStyle.width = sourceSize.width;
+    containerStyle.width = sourceSize.width;
   }
   if (height != null) {
-    sizeStyle.height = height;
+    containerStyle.height = height;
   } else if (sourceSize) {
-    sizeStyle.height = sourceSize.height;
+    containerStyle.height = sourceSize.height;
+  }
+
+  if (borderRadius) {
+    containerStyle.borderRadius = borderRadius;
   }
 
   return (
@@ -104,8 +124,23 @@ export const MorphCardTarget = ({
       targetWidth={0}
       targetHeight={0}
       targetBorderRadius={borderRadius != null ? borderRadius : -1}
-      style={sizeStyle}
+      style={containerStyle}
       onLayout={handleLayout}
-    />
+    >
+      {sourceEntry &&
+        !sourceEntry.scaleMode &&
+        (sourceEntry.backgroundColor && sourceEntry.layoutWidth ? (
+          <View
+            style={{
+              width: sourceEntry.layoutWidth,
+              height: sourceEntry.layoutHeight,
+            }}
+          >
+            {sourceEntry.children}
+          </View>
+        ) : (
+          sourceEntry.children
+        ))}
+    </NativeTargetView>
   );
 };

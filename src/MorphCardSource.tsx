@@ -3,15 +3,17 @@ import {
   Pressable,
   type ViewStyle,
   type DimensionValue,
+  type LayoutChangeEvent,
   View,
   findNodeHandle,
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
 import NativeSourceViewSpec from './specs/NativeMorphCardSource';
+import { setSourceEntry, setSourceLayout, clearSourceEntry } from './MorphChildrenRegistry';
 
 const NativeSourceView = NativeSourceViewSpec ?? View;
 
-export type ScaleMode = 'aspectFill' | 'aspectFit' | 'stretch';
+export type ResizeMode = 'cover' | 'contain' | 'stretch';
 
 export interface MorphCardSourceProps {
   ref?: React.Ref<any>;
@@ -21,8 +23,8 @@ export interface MorphCardSourceProps {
   height?: DimensionValue;
   borderRadius?: number;
   backgroundColor?: string;
-  /** How the snapshot scales in no-wrapper mode (no backgroundColor). Default: 'aspectFill' */
-  scaleMode?: ScaleMode;
+  /** How the snapshot scales in no-wrapper mode (no backgroundColor). Default: 'cover' */
+  resizeMode?: ResizeMode;
   onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
 }
@@ -35,12 +37,23 @@ export const MorphCardSource = ({
   height,
   borderRadius,
   backgroundColor,
-  scaleMode,
+  resizeMode,
   onPress,
   ref,
 }: MorphCardSourceProps) => {
   const nativeRef = React.useRef<any>(null);
   React.useImperativeHandle(ref, () => nativeRef.current);
+
+  // Store children in shared registry so MorphCardTarget can clone them
+  React.useEffect(() => {
+    const tag = findNodeHandle(nativeRef.current);
+    if (tag != null) {
+      setSourceEntry(tag, children, backgroundColor, resizeMode);
+    }
+    return () => {
+      if (tag != null) clearSourceEntry(tag);
+    };
+  }, [children, backgroundColor, resizeMode]);
 
   const style: ViewStyle = {};
   if (width != null) style.width = width as ViewStyle['width'];
@@ -50,6 +63,15 @@ export const MorphCardSource = ({
     style.overflow = 'hidden';
   }
   if (backgroundColor != null) style.backgroundColor = backgroundColor;
+
+  const handleLayout = React.useCallback((e: LayoutChangeEvent) => {
+    const tag = findNodeHandle(nativeRef.current);
+    if (tag != null) {
+      const { width: lw, height: lh } = e.nativeEvent.layout;
+      setSourceLayout(tag, lw, lh);
+    }
+  }, []);
+
   const handlePress = React.useCallback(() => {
     if (!onPress) return;
     const tag = findNodeHandle(nativeRef.current);
@@ -63,7 +85,7 @@ export const MorphCardSource = ({
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={scaleMode} cardBorderRadius={borderRadius} style={style}>
+    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={resizeMode === 'contain' ? 'aspectFit' : resizeMode === 'stretch' ? 'stretch' : 'aspectFill'} cardBorderRadius={borderRadius} style={style} onLayout={handleLayout}>
       {children}
     </NativeSourceView>
   );

@@ -25,7 +25,7 @@ const examples = [
     key: 'Gallery' as const,
     title: 'Photo Gallery',
     subtitle: 'Grid photos expanding to fullscreen viewer',
-    tags: ['no-wrapper mode', 'scaleMode', 'grid layout', 'variable card sizes', 'custom duration'],
+    tags: ['no-wrapper mode', 'resizeMode', 'grid layout', 'variable card sizes', 'custom duration'],
     color: '#FF9500',
   },
   {
@@ -39,7 +39,7 @@ const examples = [
     key: 'ScaleModes' as const,
     title: 'Scale Modes',
     subtitle: 'Compare aspectFill, aspectFit, and stretch',
-    tags: ['no-wrapper mode', 'scaleMode comparison', 'aspectFill', 'aspectFit', 'stretch'],
+    tags: ['no-wrapper mode', 'resizeMode comparison', 'cover', 'contain', 'stretch'],
     color: '#FF2D55',
   },
   {
@@ -55,6 +55,13 @@ const examples = [
     subtitle: '200 cards in a FlatList — stress test',
     tags: ['FlatList', '200 items', 'view recycling', 'scroll performance'],
     color: '#FF3B30',
+  },
+  {
+    key: 'Countdown' as const,
+    title: 'Live Countdown',
+    subtitle: 'Timer keeps ticking after expand — proves live children',
+    tags: ['live children', 'observable state', 'no bitmap'],
+    color: '#E94560',
   },
 ];
 

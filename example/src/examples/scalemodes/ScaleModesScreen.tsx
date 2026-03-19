@@ -3,15 +3,15 @@ import { Image, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MorphCardSource } from 'react-native-morph-card';
-import type { ScaleMode } from 'react-native-morph-card';
+import type { ResizeMode } from 'react-native-morph-card';
 import type { RootStackParamList } from '../../App';
 import { landscapes } from '../../assets';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'ScaleModes'>;
 
-const modes: { mode: ScaleMode; label: string; description: string }[] = [
-  { mode: 'aspectFill', label: 'Aspect Fill', description: 'Fills target, crops excess' },
-  { mode: 'aspectFit', label: 'Aspect Fit', description: 'Fits inside target, may letterbox' },
+const modes: { mode: ResizeMode; label: string; description: string }[] = [
+  { mode: 'cover', label: 'Cover', description: 'Fills target, crops excess' },
+  { mode: 'contain', label: 'Contain', description: 'Fits inside target, may letterbox' },
   { mode: 'stretch', label: 'Stretch', description: 'Stretches to fill exactly' },
 ];
 
@@ -33,7 +33,7 @@ export default function ScaleModesScreen() {
           </Text>
           <MorphCardSource
             expandDuration={350}
-            scaleMode={item.mode}
+            resizeMode={item.mode}
             borderRadius={16}
             height={180}
             onPress={(sourceTag: number) =>

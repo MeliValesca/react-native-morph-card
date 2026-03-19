@@ -16,6 +16,9 @@ import MixedScreen from './examples/mixed/MixedScreen';
 import MixedDetailScreen from './examples/mixed/MixedDetailScreen';
 import PerformanceScreen from './examples/performance/PerformanceScreen';
 import PerformanceDetailScreen from './examples/performance/PerformanceDetailScreen';
+import CountdownScreen from './examples/countdown/CountdownScreen';
+import CountdownDetailScreen from './examples/countdown/CountdownDetailScreen';
+import { CountdownProvider } from './examples/countdown/CountdownContext';
 
 export type RootStackParamList = {
   ExampleList: undefined;
@@ -33,6 +36,8 @@ export type RootStackParamList = {
   MixedDetail: { sourceTag: number; card: { id: string; type: string; title: string; subtitle: string; bg?: string } };
   Performance: undefined;
   PerformanceDetail: { sourceTag: number };
+  Countdown: undefined;
+  CountdownDetail: { sourceTag: number };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -45,6 +50,7 @@ const morphModal = {
 
 export default function App() {
   return (
+    <CountdownProvider>
     <NavigationContainer>
       <Stack.Navigator>
         <Stack.Screen
@@ -122,7 +128,18 @@ export default function App() {
           component={PerformanceDetailScreen}
           options={morphModal}
         />
+        <Stack.Screen
+          name="Countdown"
+          component={CountdownScreen}
+          options={{ title: 'Live Countdown' }}
+        />
+        <Stack.Screen
+          name="CountdownDetail"
+          component={CountdownDetailScreen}
+          options={morphModal}
+        />
       </Stack.Navigator>
     </NavigationContainer>
+    </CountdownProvider>
   );
 }

@@ -655,6 +655,8 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
 
       target.showSnapshot(bitmap, frame, cornerRadius, null)
       Log.d(TAG, "transferSnapshot: handed snapshot to MorphCardTargetView")
+      // Crossfade snapshot out to reveal live React children underneath
+      mainHandler.postDelayed({ target.fadeOutSnapshot() }, 50)
     }
 
     val fadeOut = ValueAnimator.ofFloat(1f, 0f)

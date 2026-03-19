@@ -1,5 +1,6 @@
 package com.melivalesca.morphcard
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -21,6 +22,7 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   private var snapshotFrame: RectF? = null
   private var snapshotCornerRadius: Float = 0f
   private var snapshotBgColor: Int? = null
+  private var snapshotAlpha: Float = 1f
   private val snapshotPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
   private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -58,7 +60,9 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
   override fun dispatchDraw(canvas: Canvas) {
     val bmp = snapshotBitmap
     val frame = snapshotFrame
-    if (bmp != null && frame != null) {
+    if (bmp != null && frame != null && snapshotAlpha > 0f) {
+      snapshotPaint.alpha = (snapshotAlpha * 255).toInt()
+      bgPaint.alpha = (snapshotAlpha * 255).toInt()
       val radiusPx = snapshotCornerRadius
 
       // Clip to rounded rect if needed
@@ -112,6 +116,26 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     snapshotCornerRadius = cornerRadius
     snapshotBgColor = backgroundColor
     invalidate()
+  }
+
+  fun fadeOutSnapshot() {
+    if (snapshotBitmap == null) return
+    // Only fade out if there are React children underneath to reveal.
+    // If no children (scaleMode bitmap-only), keep the snapshot.
+    if (childCount == 0) return
+    val anim = ValueAnimator.ofFloat(1f, 0f)
+    anim.duration = 150
+    anim.addUpdateListener {
+      snapshotAlpha = it.animatedValue as Float
+      invalidate()
+    }
+    anim.addListener(object : android.animation.AnimatorListenerAdapter() {
+      override fun onAnimationEnd(animation: android.animation.Animator) {
+        clearSnapshot()
+        snapshotAlpha = 1f
+      }
+    })
+    anim.start()
   }
 
   fun clearSnapshot() {
