@@ -46,6 +46,10 @@ class MorphCardSourceManager :
     view.rotationEndAngle = value
   }
 
+  override fun setPresentation(view: MorphCardSourceView, value: String?) {
+    view.presentation = value ?: "transparentModal"
+  }
+
   companion object {
     const val REACT_CLASS = "RNCMorphCardSource"
   }

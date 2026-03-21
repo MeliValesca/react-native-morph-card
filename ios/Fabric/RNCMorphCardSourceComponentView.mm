@@ -600,8 +600,10 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       [wrapper.layer addAnimation:rotAnim forKey:@"morphRotation"];
     }
 
-    // Fade out target screen
-    [self scheduleScreenFadeOut:targetScreen duration:dur];
+    // Fade out target screen (only if different from source screen)
+    if (targetScreen && targetScreen != sourceScreen) {
+      [self scheduleScreenFadeOut:targetScreen duration:dur];
+    }
 
     [animator addCompletion:^(UIViewAnimatingPosition pos) {
       [self collapseCleanupWithContainer:wrapper resolve:resolve];
@@ -674,8 +676,10 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
       [container.layer addAnimation:rotAnim forKey:@"morphRotation"];
     }
 
-    // Fade out target screen
-    [self scheduleScreenFadeOut:targetScreen duration:dur];
+    // Fade out target screen (only if different from source screen)
+    if (targetScreen && targetScreen != sourceScreen) {
+      [self scheduleScreenFadeOut:targetScreen duration:dur];
+    }
 
     [animator addCompletion:^(UIViewAnimatingPosition pos) {
       [self collapseCleanupWithContainer:container resolve:resolve];

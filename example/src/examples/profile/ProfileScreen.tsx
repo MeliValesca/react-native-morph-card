@@ -64,7 +64,8 @@ export default function ProfileScreen() {
           <MorphCardSource
             backgroundColor="#fff"
             borderRadius={20}
-            expandDuration={400}
+            expandDuration={500}
+            presentation="push"
             onPress={(sourceTag) =>
               navigation.navigate('ProfileDetail', { sourceTag, user })
             }

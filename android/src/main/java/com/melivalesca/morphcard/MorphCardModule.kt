@@ -2,6 +2,7 @@ package com.melivalesca.morphcard
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -11,11 +12,14 @@ class MorphCardModule(reactContext: ReactApplicationContext) :
   NativeMorphCardModuleSpec(reactContext) {
 
   private val mainHandler = Handler(Looper.getMainLooper())
+  // Cache source view for collapse — the view might be unregistered during push navigation
+  private var cachedSourceView: MorphCardSourceView? = null
 
   override fun prepareExpand(sourceTag: Double) {
     mainHandler.post {
       val sourceView = MorphCardViewRegistry.getView(sourceTag.toInt())
       if (sourceView is MorphCardSourceView) {
+        cachedSourceView = sourceView
         sourceView.prepareExpand(null)
       }
     }
@@ -89,9 +93,11 @@ class MorphCardModule(reactContext: ReactApplicationContext) :
 
   override fun collapse(sourceTag: Double, promise: Promise) {
     mainHandler.post {
-      val sourceView = MorphCardViewRegistry.getView(sourceTag.toInt())
-      if (sourceView is MorphCardSourceView) {
+      val sourceView = MorphCardViewRegistry.getView(sourceTag.toInt()) as? MorphCardSourceView
+        ?: cachedSourceView
+      if (sourceView != null) {
         sourceView.collapseWithResolve(promise)
+        cachedSourceView = null
       } else {
         promise.resolve(false)
       }

@@ -35,10 +35,18 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     Log.d(TAG, "TargetView attached: id=$id sourceTag=$sourceTag")
 
     if (sourceTag > 0) {
-      val screenContainer = findScreenContainer(this)
-      if (screenContainer != null) {
-        screenContainer.visibility = View.INVISIBLE
-        Log.d(TAG, "TargetView: set screen INVISIBLE")
+      // Check if source uses push presentation — if so, don't hide the screen
+      val sourceView = MorphCardViewRegistry.getView(sourceTag) as? MorphCardSourceView
+      val isPush = sourceView?.presentation == "push"
+
+      if (!isPush) {
+        val screenContainer = findScreenContainer(this)
+        if (screenContainer != null) {
+          screenContainer.visibility = View.INVISIBLE
+          Log.d(TAG, "TargetView: set screen INVISIBLE")
+        }
+      } else {
+        Log.d(TAG, "TargetView: push mode — skipping screen hide")
       }
       // Hide children until snapshot is in place to avoid flash of un-rotated content
       hideChildren()
@@ -47,6 +55,21 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
+    // Reset source state when target is removed (e.g. navigation back without morphCollapse)
+    // Don't reset if a collapse animation is in progress.
+    if (sourceTag > 0) {
+      val sourceView = MorphCardViewRegistry.getView(sourceTag) as? MorphCardSourceView
+      if (sourceView != null && sourceView.isExpanded && !sourceView.isCollapsing) {
+        Log.d(TAG, "TargetView detached while expanded — resetting source state")
+        sourceView.isExpanded = false
+        sourceView.alpha = 1f
+        val decorView = sourceView.getDecorView()
+        sourceView.overlayContainer?.let { overlay ->
+          decorView?.removeView(overlay)
+          sourceView.overlayContainer = null
+        }
+      }
+    }
     MorphCardViewRegistry.unregister(id)
   }
 

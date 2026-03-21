@@ -23,7 +23,7 @@ export default function GalleryDetailScreen({ route, navigation }: Props) {
         width={SCREEN_WIDTH}
         height={SCREEN_WIDTH}
         borderRadius={0}
-        collapseDuration={200}
+        collapseDuration={1000}
       />
 
       {/* Close button */}

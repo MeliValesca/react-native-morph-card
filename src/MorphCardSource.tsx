@@ -29,6 +29,8 @@ export interface MorphCardSourceProps {
   rotations?: number;
   /** Final rotation angle in degrees after expand. Default: 0 */
   rotationEndAngle?: number;
+  /** Presentation mode. 'transparentModal' (default) or 'push' for slide-in with morph. */
+  presentation?: 'transparentModal' | 'push';
   onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
 }
@@ -44,6 +46,7 @@ export const MorphCardSource = ({
   resizeMode,
   rotations,
   rotationEndAngle,
+  presentation = 'transparentModal',
   onPress,
   ref,
 }: MorphCardSourceProps) => {
@@ -54,12 +57,12 @@ export const MorphCardSource = ({
   React.useEffect(() => {
     const tag = findNodeHandle(nativeRef.current);
     if (tag != null) {
-      setSourceEntry(tag, children, backgroundColor, resizeMode);
+      setSourceEntry(tag, children, backgroundColor, resizeMode, presentation);
     }
     return () => {
       if (tag != null) clearSourceEntry(tag);
     };
-  }, [children, backgroundColor, resizeMode]);
+  }, [children, backgroundColor, resizeMode, presentation]);
 
   const style: ViewStyle = {};
   if (width != null) style.width = width as ViewStyle['width'];
@@ -91,7 +94,7 @@ export const MorphCardSource = ({
   }, [onPress]);
 
   const content = (
-    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={resizeMode === 'contain' ? 'aspectFit' : resizeMode === 'stretch' ? 'stretch' : 'aspectFill'} cardBorderRadius={borderRadius} rotations={rotations} rotationEndAngle={rotationEndAngle} style={style} onLayout={handleLayout}>
+    <NativeSourceView ref={nativeRef} duration={duration} expandDuration={expandDuration} scaleMode={resizeMode === 'contain' ? 'aspectFit' : resizeMode === 'stretch' ? 'stretch' : 'aspectFill'} cardBorderRadius={borderRadius} rotations={rotations} rotationEndAngle={rotationEndAngle} presentation={presentation} style={style} onLayout={handleLayout}>
       {children}
     </NativeSourceView>
   );

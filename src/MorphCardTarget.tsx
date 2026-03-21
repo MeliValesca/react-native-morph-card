@@ -132,11 +132,20 @@ export const MorphCardTarget = ({
         (sourceEntry.backgroundColor && sourceEntry.layoutWidth ? (
           <View
             style={{
-              width: sourceEntry.layoutWidth,
-              height: sourceEntry.layoutHeight,
+              flex: 1,
+              justifyContent: contentCentered ? 'center' : 'flex-start',
+              alignItems: contentCentered ? 'center' : 'flex-start',
+              paddingTop: contentOffsetY || 0,
             }}
           >
-            {sourceEntry.children}
+            <View
+              style={{
+                width: sourceEntry.layoutWidth,
+                height: sourceEntry.layoutHeight,
+              }}
+            >
+              {sourceEntry.children}
+            </View>
           </View>
         ) : (
           sourceEntry.children

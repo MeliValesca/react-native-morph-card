@@ -23,6 +23,7 @@ export default function MusicDetailScreen({ route, navigation }: Props) {
           sourceTag={route.params.sourceTag}
           width={300}
           height={300}
+          collapseDuration={400}
           borderRadius={16}
         />
 

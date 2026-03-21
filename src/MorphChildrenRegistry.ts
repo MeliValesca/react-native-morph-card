@@ -4,6 +4,7 @@ export interface SourceEntry {
   children: ReactNode;
   backgroundColor?: string;
   scaleMode?: string;
+  presentation?: string;
   layoutWidth?: number;
   layoutHeight?: number;
 }
@@ -14,13 +15,15 @@ export function setSourceEntry(
   tag: number,
   children: ReactNode,
   backgroundColor?: string,
-  scaleMode?: string
+  scaleMode?: string,
+  presentation?: string
 ) {
   const existing = registry.get(tag);
   registry.set(tag, {
     children,
     backgroundColor,
     scaleMode,
+    presentation,
     layoutWidth: existing?.layoutWidth,
     layoutHeight: existing?.layoutHeight,
   });

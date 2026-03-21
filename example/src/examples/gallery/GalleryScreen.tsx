@@ -10,7 +10,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Gallery'>;
 
 export default function GalleryScreen() {
   const navigation = useNavigation<Nav>();
-
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: '#000' }}
@@ -27,6 +26,8 @@ export default function GalleryScreen() {
               resizeMode="contain"
               borderRadius={0}
               expandDuration={450}
+              rotations={0}
+              rotationEndAngle={55}
               onPress={(sourceTag: number) =>
                 navigation.navigate('GalleryDetail', { sourceTag })
               }

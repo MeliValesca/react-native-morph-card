@@ -13,6 +13,7 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
 
 @implementation RNCMorphCardTargetComponentView {
   UIView *_snapshotContainer; // our own view — Fabric can't reset its styles
+  NSInteger _sourceTag;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider {
@@ -24,6 +25,7 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
            oldProps:(const Props::Shared &)oldProps {
   const auto &newProps =
       *std::static_pointer_cast<const RNCMorphCardTargetProps>(props);
+  _sourceTag = newProps.sourceTag;
   _targetWidth = newProps.targetWidth;
   _targetHeight = newProps.targetHeight;
   _targetBorderRadius = newProps.targetBorderRadius;
@@ -38,9 +40,15 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
 
     // Immediately hide the detail screen container to prevent flicker.
     // The expand animation will fade it back in.
-    UIView *screenContainer = RNCMorphCardFindScreenContainer(self);
-    if (screenContainer) {
-      screenContainer.alpha = 0;
+    // Only hide if source is in a DIFFERENT screen container (i.e. navigation).
+    // If source and target share the same screen (no navigation), don't hide.
+    UIView *targetScreen = RNCMorphCardFindScreenContainer(self);
+    if (targetScreen) {
+      UIView *sourceView = [[RNCMorphCardViewRegistry shared] viewForTag:_sourceTag];
+      UIView *sourceScreen = sourceView ? RNCMorphCardFindScreenContainer(sourceView) : nil;
+      if (sourceScreen != targetScreen) {
+        targetScreen.alpha = 0;
+      }
     }
   } else {
     [[RNCMorphCardViewRegistry shared] unregisterViewWithTag:self.tag];
