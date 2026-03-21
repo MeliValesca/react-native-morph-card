@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
      backgroundColor:(nullable UIColor *)bgColor;
 - (void)fadeOutSnapshot;
 - (void)clearSnapshot;
+- (void)showChildren;
 
 @end
 

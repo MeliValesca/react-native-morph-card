@@ -88,7 +88,7 @@ export default function CountdownScreen({ navigation }: Props) {
             height={160}
             borderRadius={18}
             backgroundColor="#fff"
-            duration={300}
+            duration={400}
             presentation="push"
             onPress={(sourceTag: number) =>
               navigation.navigate('CountdownDetail', { sourceTag })

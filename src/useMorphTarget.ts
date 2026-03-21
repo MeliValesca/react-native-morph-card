@@ -19,13 +19,14 @@ export function useMorphTarget({ sourceTag, navigation }: UseMorphTargetOptions)
     const presentation = entry?.presentation || 'transparentModal';
 
     if (presentation === 'push') {
-      // For push: goBack instantly first (reveals source screen),
-      // then collapse reuses the expand overlay (already above source screen).
+      // For push: start collapse first (hides target, sets up overlay),
+      // then goBack instantly, collapse continues over source screen.
+      const collapsePromise = NativeMorphCardModule.collapse(sourceTag);
+      // Wait one frame for collapse to create overlay and hide target
+      await new Promise<void>(r => requestAnimationFrame(() => r()));
       navigation.setOptions({ animation: 'none' });
       navigation.goBack();
-      // Wait one frame for goBack to process before collapsing
-      await new Promise<void>(r => requestAnimationFrame(() => r()));
-      await NativeMorphCardModule.collapse(sourceTag);
+      await collapsePromise;
     } else {
       // For transparentModal: collapse first, then navigate back
       await NativeMorphCardModule.collapse(sourceTag);

@@ -72,7 +72,7 @@ const morphModal = {
 
 const morphPush = {
   presentation: 'card' as const,
-  animation: 'slide_from_right' as const,
+  animation: 'slide_from_left' as const,
   headerShown: false,
 };
 

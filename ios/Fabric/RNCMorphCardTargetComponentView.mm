@@ -42,16 +42,43 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     // The expand animation will fade it back in.
     // Only hide if source is in a DIFFERENT screen container (i.e. navigation).
     // If source and target share the same screen (no navigation), don't hide.
-    UIView *targetScreen = RNCMorphCardFindScreenContainer(self);
-    if (targetScreen) {
-      UIView *sourceView = [[RNCMorphCardViewRegistry shared] viewForTag:_sourceTag];
-      UIView *sourceScreen = sourceView ? RNCMorphCardFindScreenContainer(sourceView) : nil;
-      if (sourceScreen != targetScreen) {
-        targetScreen.alpha = 0;
+    // For push presentation, don't hide — the target screen is already visible.
+    UIView *sourceView = [[RNCMorphCardViewRegistry shared] viewForTag:_sourceTag];
+    BOOL sourceIsPush = NO;
+    if (sourceView && [sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+      sourceIsPush = ((RNCMorphCardSourceComponentView *)sourceView).isPush;
+    }
+    if (sourceIsPush) {
+      // Push mode: hide just the target card (not the screen) until expand completes.
+      // The expand overlay covers it; showChildren restores it.
+      self.alpha = 0;
+    } else {
+      UIView *targetScreen = RNCMorphCardFindScreenContainer(self);
+      if (targetScreen) {
+        UIView *sourceScreen = sourceView ? RNCMorphCardFindScreenContainer(sourceView) : nil;
+        if (sourceScreen != targetScreen) {
+          targetScreen.alpha = 0;
+        }
       }
     }
   } else {
     [[RNCMorphCardViewRegistry shared] unregisterViewWithTag:self.tag];
+    // Reset source state when target is removed (e.g. back navigation without morphCollapse)
+    if (_sourceTag > 0) {
+      UIView *sv = [[RNCMorphCardViewRegistry shared] viewForTag:_sourceTag];
+      if (sv && [sv isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+        RNCMorphCardSourceComponentView *source = (RNCMorphCardSourceComponentView *)sv;
+        if (source.isExpanded && !source.isCollapsing) {
+          source.isExpanded = NO;
+          source.alpha = 1;
+          if (source.wrapperView) {
+            [source.wrapperView removeFromSuperview];
+            source.wrapperView = nil;
+          }
+          source.snapshotView = nil;
+        }
+      }
+    }
   }
 }
 
@@ -105,6 +132,16 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
   if (_snapshotContainer) {
     [_snapshotContainer removeFromSuperview];
     _snapshotContainer = nil;
+  }
+}
+
+- (void)showChildren {
+  // For push mode: ensure all React subviews are visible
+  for (UIView *child in self.subviews) {
+    if (child != _snapshotContainer) {
+      child.hidden = NO;
+      child.alpha = 1;
+    }
   }
 }
 

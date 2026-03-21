@@ -5,12 +5,29 @@
 #import "RNCMorphCardSourceComponentView.h"
 #endif
 
-@implementation RNCMorphCardModule
+@implementation RNCMorphCardModule {
+  NSMutableDictionary<NSNumber *, RNCMorphCardSourceComponentView *> *_cachedSources;
+}
 
 RCT_EXPORT_MODULE()
 
-// No-op on iOS — Android uses this to create the overlay before navigation
 RCT_EXPORT_METHOD(prepareExpand : (double)sourceTag) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+#ifdef RCT_NEW_ARCH_ENABLED
+    UIView *sourceView =
+        [[RNCMorphCardViewRegistry shared] viewForTag:(NSInteger)sourceTag];
+    if ([sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+      RNCMorphCardSourceComponentView *src =
+          (RNCMorphCardSourceComponentView *)sourceView;
+      // For push mode: capture source position before navigation
+      if (!self->_cachedSources) self->_cachedSources = [NSMutableDictionary new];
+      self->_cachedSources[@((NSInteger)sourceTag)] = src;
+      if (src.isPush) {
+        [src prepareExpand];
+      }
+    }
+#endif
+  });
 }
 
 RCT_EXPORT_METHOD(setTargetConfig
@@ -55,15 +72,15 @@ RCT_EXPORT_METHOD(expand
                 viewForTag:(NSInteger)targetTag];
 
 #ifdef RCT_NEW_ARCH_ENABLED
-        if ([sourceView
-                isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
-          [(RNCMorphCardSourceComponentView *)sourceView
-              expandToTarget:targetView
-                     resolve:resolve];
+        RNCMorphCardSourceComponentView *src = nil;
+        if ([sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+          src = (RNCMorphCardSourceComponentView *)sourceView;
         } else {
-          NSLog(@"[MorphCard] expand: source %ld is not a "
-                @"RNCMorphCardSourceComponentView",
-                (long)sourceTag);
+          src = self->_cachedSources[@((NSInteger)sourceTag)];
+        }
+        if (src) {
+          [src expandToTarget:targetView resolve:resolve];
+        } else {
           resolve(@(NO));
         }
 #else
@@ -99,14 +116,19 @@ RCT_EXPORT_METHOD(collapse
         [[RNCMorphCardViewRegistry shared] viewForTag:(NSInteger)sourceTag];
 
 #ifdef RCT_NEW_ARCH_ENABLED
-    if ([sourceView
-            isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
-      [(RNCMorphCardSourceComponentView *)sourceView
-          collapseWithResolve:resolve];
+    RNCMorphCardSourceComponentView *src = nil;
+    if ([sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+      src = (RNCMorphCardSourceComponentView *)sourceView;
     } else {
-      NSLog(@"[MorphCard] collapse: source %ld is not a "
-            @"RNCMorphCardSourceComponentView",
-            (long)sourceTag);
+      src = self->_cachedSources[@((NSInteger)sourceTag)];
+    }
+    NSLog(@"[MorphCard] collapse: src=%@ isExpanded=%d isCollapsing=%d wrapper=%@",
+          src, src.isExpanded, src.isCollapsing, src.wrapperView);
+    if (src) {
+      [src collapseWithResolve:resolve];
+      [self->_cachedSources removeObjectForKey:@((NSInteger)sourceTag)];
+    } else {
+      NSLog(@"[MorphCard] collapse: no source view found");
       resolve(@(NO));
     }
 #else
