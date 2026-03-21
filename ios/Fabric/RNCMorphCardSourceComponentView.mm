@@ -299,13 +299,14 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
 
     if (_isPush) {
       // Push wrapper mode: shadow below the card.
-      // masksToBounds = NO for shadow rendering. The backgroundColor
-      // fills the rounded area, masking any content overflow.
+      // masksToBounds = NO for shadow, content clips itself with cornerRadius.
       wrapper.layer.masksToBounds = NO;
       wrapper.layer.shadowColor = [UIColor blackColor].CGColor;
       wrapper.layer.shadowOffset = CGSizeMake(0, 8);
-      wrapper.layer.shadowOpacity = 0.15;
-      wrapper.layer.shadowRadius = 6;
+      wrapper.layer.shadowOpacity = 0.12;
+      wrapper.layer.shadowRadius = 5;
+      // Content clips itself since wrapper can't (masksToBounds = NO)
+      content.layer.cornerRadius = _cardCornerRadius;
     }
   } else {
     wrapper = [[UIView alloc] initWithFrame:CGRectZero];

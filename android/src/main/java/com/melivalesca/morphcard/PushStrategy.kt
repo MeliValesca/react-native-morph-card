@@ -91,7 +91,7 @@ class PushStrategy : MorphAnimationStrategy {
       sourceView.cardWidth.toInt(), sourceView.cardHeight.toInt()
     )
     wrapper.addView(content)
-    wrapper.translationZ = 8f
+    wrapper.translationZ = 16f
 
     // Force layout so the outline provider can read width/height for clipping
     val w = sourceView.cardWidth.toInt()

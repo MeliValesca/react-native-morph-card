@@ -216,7 +216,8 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
   // Unhide the wrapper at its existing position (saved from expand).
   wrapper.alpha = 1;
   wrapper.hidden = NO;
-  wrapper.clipsToBounds = YES;
+  // Keep masksToBounds = NO for wrapper mode (shadow rendering)
+  wrapper.clipsToBounds = sourceView.hasWrapper ? NO : YES;
   [wrapper.layer removeAnimationForKey:@"morphRotation"];
   wrapper.transform = CGAffineTransformIdentity;
   // Ensure all subviews are visible
