@@ -322,8 +322,8 @@ class PushStrategy : MorphAnimationStrategy {
     val startImgW = content.layoutParams.width.toFloat()
     val startImgH = content.layoutParams.height.toFloat()
 
-    // Slight overshoot for a natural bouncy feel when landing
-    val collapseInterpolator = android.view.animation.OvershootInterpolator(1.0f)
+    // Snappy overshoot for a natural bouncy feel when landing
+    val collapseInterpolator = android.view.animation.OvershootInterpolator(1.5f)
 
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = dur

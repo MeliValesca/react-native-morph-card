@@ -296,6 +296,17 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     content.clipsToBounds = YES;
     content.frame = (CGRect){CGPointZero, _cardFrame.size};
     [wrapper addSubview:content];
+
+    if (_isPush) {
+      // Push wrapper mode: shadow below the card.
+      // masksToBounds = NO for shadow rendering. The backgroundColor
+      // fills the rounded area, masking any content overflow.
+      wrapper.layer.masksToBounds = NO;
+      wrapper.layer.shadowColor = [UIColor blackColor].CGColor;
+      wrapper.layer.shadowOffset = CGSizeMake(0, 8);
+      wrapper.layer.shadowOpacity = 0.15;
+      wrapper.layer.shadowRadius = 6;
+    }
   } else {
     wrapper = [[UIView alloc] initWithFrame:CGRectZero];
     wrapper.bounds = CGRectMake(0, 0, _cardFrame.size.width, _cardFrame.size.height);
@@ -308,18 +319,33 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     snapshot.frame = (CGRect){CGPointZero, _cardFrame.size};
     [wrapper addSubview:snapshot];
     _snapshot = snapshot;
+
+    // No-wrapper push: no shadow (clipsToBounds blocks it, and
+    // masksToBounds=NO would show square corners of the snapshot)
   }
 
   [window addSubview:wrapper];
   _wrapperView = wrapper;
 
   // Start a subtle scale-up during the delay before expandToTarget fires.
-  // This gives visual feedback that the morph has started.
+  // Use bounds/center instead of transform to avoid cornerRadius distortion.
+  CGRect startBounds = wrapper.bounds;
+  CGPoint startCenter = wrapper.center;
+  CGFloat scale = 1.05;
   [UIView animateWithDuration:0.15
                         delay:0
                       options:UIViewAnimationOptionCurveEaseOut
                    animations:^{
-                     wrapper.transform = CGAffineTransformMakeScale(1.05, 1.05);
+                     wrapper.bounds = CGRectMake(0, 0,
+                       startBounds.size.width * scale,
+                       startBounds.size.height * scale);
+                     // Scale content with wrapper so edges don't show
+                     UIView *content = wrapper.subviews.firstObject;
+                     if (content) {
+                       content.frame = CGRectMake(0, 0,
+                         startBounds.size.width * scale,
+                         startBounds.size.height * scale);
+                     }
                    }
                    completion:nil];
 }

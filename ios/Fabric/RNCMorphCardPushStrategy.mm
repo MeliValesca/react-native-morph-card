@@ -61,9 +61,6 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     wrapper.center = CGPointMake(CGRectGetMidX(cardFrame), CGRectGetMidY(cardFrame));
   }
 
-  // Reset the pre-animation scale from prepareExpand
-  wrapper.transform = CGAffineTransformIdentity;
-
   // IMPORTANT: Hide source and target cards during expand animation
   sourceView.alpha = 0;
   if (targetView) { targetView.alpha = 0; }
@@ -86,6 +83,8 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     if (!tv || !tv.window) return;
 
     if (!animationStarted) {
+      // Reset pre-animation scale on first frame
+      wrapper.transform = CGAffineTransformIdentity;
       startTime = CACurrentMediaTime();
       animationStarted = YES;
     }

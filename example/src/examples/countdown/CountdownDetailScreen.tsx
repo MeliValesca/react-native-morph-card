@@ -83,7 +83,7 @@ export default function CountdownDetailScreen({ route, navigation }: Props) {
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[1, 2, 3, 4].map(r => (
+            {[1, 2, 3, 4].map((r) => (
               <View
                 key={r}
                 style={{

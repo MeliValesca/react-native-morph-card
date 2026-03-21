@@ -9,8 +9,15 @@ export default function CountdownTimer() {
   const accent = isRest ? '#34C759' : '#FF3B30';
   const label = isRest ? 'REST' : 'WORK';
 
-  const exercises = ['Burpees', 'Mountain Climbers', 'Jump Squats', 'High Knees'];
-  const currentExercise = isRest ? 'Rest' : exercises[(round - 1) % exercises.length];
+  const exercises = [
+    'Burpees',
+    'Mountain Climbers',
+    'Jump Squats',
+    'High Knees',
+  ];
+  const currentExercise = isRest
+    ? 'Rest'
+    : exercises[(round - 1) % exercises.length];
   const nextExercise = exercises[round % exercises.length];
 
   const mins = Math.floor(seconds / 60);
@@ -41,21 +48,44 @@ export default function CountdownTimer() {
             marginBottom: 6,
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: '700', color: accent, letterSpacing: 1 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: '700',
+              color: accent,
+              letterSpacing: 1,
+            }}
+          >
             {label}
           </Text>
         </View>
-        <Text style={{ fontSize: 38, fontWeight: '200', color: '#1a1a1a', fontVariant: ['tabular-nums'] }}>
+        <Text
+          style={{
+            fontSize: 38,
+            fontWeight: '200',
+            color: '#1a1a1a',
+            fontVariant: ['tabular-nums'],
+          }}
+        >
           {display}
         </Text>
-        <Text style={{ fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginTop: 4 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#1a1a1a',
+            marginTop: 4,
+          }}
+        >
           {currentExercise}
         </Text>
         <Text style={{ fontSize: 11, color: '#8E8E93', marginTop: 2 }}>
           Round {round}/4 · Next: {nextExercise}
         </Text>
       </View>
-      <View style={{ width: 80, justifyContent: 'center', alignItems: 'center' }}>
+      <View
+        style={{ width: 80, justifyContent: 'center', alignItems: 'center' }}
+      >
         <View
           style={{
             width: 64,
