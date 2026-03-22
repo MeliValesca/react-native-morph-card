@@ -51,7 +51,6 @@ export default function MusicScreen() {
                 height={'100%'}
                 duration={400}
                 rotations={2}
-                presentation="push"
                 onPress={(sourceTag) =>
                   navigation.navigate('MusicDetail', { sourceTag, album })
                 }

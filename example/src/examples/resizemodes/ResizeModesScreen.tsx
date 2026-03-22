@@ -32,6 +32,7 @@ export default function ResizeModesScreen() {
             {item.description}
           </Text>
           <MorphCardSource
+            presentation="transparentModal"
             expandDuration={350}
             resizeMode={item.mode}
             borderRadius={16}

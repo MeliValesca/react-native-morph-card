@@ -30,6 +30,7 @@ export default function AppStoreScreen() {
       </Text>
 
       <MorphCardSource
+        presentation="transparentModal"
         onPress={(sourceTag) =>
           navigation.navigate('AppStoreDetail', { sourceTag })
         }

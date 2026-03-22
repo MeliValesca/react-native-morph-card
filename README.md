@@ -113,6 +113,7 @@ Wraps the card content on the list/grid screen. Captures a snapshot and drives t
 | `resizeMode`      | `'cover' \| 'contain' \| 'stretch'`        | `'cover'`      | How the snapshot scales during animation. When set, the bitmap is kept after expand (no live children). **Recommended when wrapping an `<Image>` — without it, the image may not scale properly during the animation.** |
 | `rotations`       | `number`                                   | `0`            | Number of full 360° rotations during the expand animation                                              |
 | `rotationEndAngle`| `number`                                   | `0`            | Final rotation angle in degrees after expand (e.g. `45` to end tilted). Collapse reverses it back to 0 |
+| `presentation`    | `'push' \| 'transparentModal'`             | `'push'`      | Presentation mode. `'push'` (default) plays the morph alongside a native push transition. `'transparentModal'` plays over a modal overlay with fade. |
 | `onPress`         | `(sourceTag: number) => void`              | —              | Called on tap with the native view tag. Use this to navigate to the detail screen.                     |
 
 ### `<MorphCardTarget>`
@@ -140,7 +141,12 @@ const { dismiss } = useMorphTarget({
 });
 ```
 
-> **Note:** The detail screen should be presented as a modal (e.g. `transparentModal` or `fullScreenModal` in React Navigation) so the source screen remains mounted underneath during the animation. Make sure to disable any built-in navigation transitions (e.g. `animation: 'none'` in React Navigation) — the morph animation replaces the screen transition entirely, and combining both will look broken.
+> **Screen presentation:** The `presentation` prop controls how the detail screen is navigated to:
+>
+> - **`push`** (default): The card morph plays alongside the native push transition. Works with any animation style (`slide_from_right`, `default`, `fade`, etc.).
+> - **`transparentModal`**: The card morph plays over a transparent modal overlay with fade. Use `presentation: 'transparentModal'` and `animation: 'none'` in React Navigation screen options.
+>
+> `useMorphTarget` auto-detects the presentation mode from the source — no extra config needed on the detail screen.
 
 ### Imperative API
 

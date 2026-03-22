@@ -16,7 +16,7 @@ interface UseMorphTargetOptions {
 export function useMorphTarget({ sourceTag, navigation }: UseMorphTargetOptions) {
   const dismiss = React.useCallback(async () => {
     const entry = getSourceEntry(sourceTag);
-    const presentation = entry?.presentation || 'transparentModal';
+    const presentation = entry?.presentation || 'push';
 
     if (presentation === 'push') {
       // For push: start collapse first (hides target, sets up overlay),

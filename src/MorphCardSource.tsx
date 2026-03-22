@@ -29,7 +29,7 @@ export interface MorphCardSourceProps {
   rotations?: number;
   /** Final rotation angle in degrees after expand. Default: 0 */
   rotationEndAngle?: number;
-  /** Presentation mode. 'transparentModal' (default) or 'push' for slide-in with morph. */
+  /** Presentation mode. 'push' (default) for push navigation with slide. 'transparentModal' for modal overlay with fade. */
   presentation?: 'transparentModal' | 'push';
   onPress?: (sourceTag: number) => void;
   children: React.ReactNode;
@@ -46,7 +46,7 @@ export const MorphCardSource = ({
   resizeMode,
   rotations,
   rotationEndAngle,
-  presentation = 'transparentModal',
+  presentation = 'push',
   onPress,
   ref,
 }: MorphCardSourceProps) => {

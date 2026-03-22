@@ -59,6 +59,7 @@ export default function MixedScreen() {
       {cards.map((card, index) => (
         <View key={card.id} style={{ marginBottom: 20 }}>
           <MorphCardSource
+            presentation="transparentModal"
             backgroundColor={card.type === 'wrapper' ? card.bg : undefined}
             borderRadius={card.id === 'nowrap-2' ? 100 : 16}
             height={card.id === 'nowrap-2' ? 200 : 180}

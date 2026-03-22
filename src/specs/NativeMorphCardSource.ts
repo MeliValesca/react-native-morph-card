@@ -16,7 +16,7 @@ export interface NativeMorphCardSourceProps extends ViewProps {
   cardBorderRadius?: Double;
   rotations?: Double;
   rotationEndAngle?: Double;
-  presentation?: WithDefault<'transparentModal' | 'push', 'transparentModal'>;
+  presentation?: WithDefault<'transparentModal' | 'push', 'push'>;
 }
 
 export default codegenNativeComponent<NativeMorphCardSourceProps>(
