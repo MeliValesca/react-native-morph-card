@@ -22,7 +22,6 @@ export default function PerformanceDetailScreen({ route, navigation }: Props) {
         sourceTag={route.params.sourceTag}
         width={SCREEN_WIDTH}
         height={SCREEN_WIDTH}
-        borderRadius={0}
         collapseDuration={200}
       />
 

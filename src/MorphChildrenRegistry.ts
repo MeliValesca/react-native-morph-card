@@ -9,6 +9,28 @@ export interface SourceEntry {
   layoutHeight?: number;
 }
 
+export interface TargetConfig {
+  width?: number | string;
+  height?: number | string;
+  borderRadius?: number;
+  contentCentered?: boolean;
+  contentOffsetY?: number;
+}
+
+const targetConfigs = new Map<number, TargetConfig>();
+
+export function setTargetConfig(sourceTag: number, config: TargetConfig) {
+  targetConfigs.set(sourceTag, config);
+}
+
+export function getTargetConfig(sourceTag: number): TargetConfig | undefined {
+  return targetConfigs.get(sourceTag);
+}
+
+export function clearTargetConfig(sourceTag: number) {
+  targetConfigs.delete(sourceTag);
+}
+
 const registry = new Map<number, SourceEntry>();
 
 export function setSourceEntry(

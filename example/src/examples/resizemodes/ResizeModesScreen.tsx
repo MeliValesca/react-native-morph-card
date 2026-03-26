@@ -11,8 +11,16 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'ResizeModes'>;
 
 const modes: { mode: ResizeMode; label: string; description: string }[] = [
   { mode: 'cover', label: 'Cover', description: 'Fills target, crops excess' },
-  { mode: 'contain', label: 'Contain', description: 'Fits inside target, may letterbox' },
-  { mode: 'stretch', label: 'Stretch', description: 'Stretches to fill exactly' },
+  {
+    mode: 'contain',
+    label: 'Contain',
+    description: 'Fits inside target, may letterbox',
+  },
+  {
+    mode: 'stretch',
+    label: 'Stretch',
+    description: 'Stretches to fill exactly',
+  },
 ];
 
 export default function ResizeModesScreen() {
@@ -25,20 +33,28 @@ export default function ResizeModesScreen() {
     >
       {modes.map((item, index) => (
         <View key={item.mode} style={{ marginBottom: 32 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 4 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: '700',
+              color: '#fff',
+              marginBottom: 4,
+            }}
+          >
             {item.label}
           </Text>
           <Text style={{ fontSize: 13, color: '#888', marginBottom: 12 }}>
             {item.description}
           </Text>
           <MorphCardSource
-            presentation="transparentModal"
-            expandDuration={350}
             resizeMode={item.mode}
             borderRadius={16}
             height={180}
             onPress={(sourceTag: number) =>
-              navigation.navigate('ResizeModesDetail', { sourceTag, mode: item.mode })
+              navigation.navigate('ResizeModesDetail', {
+                sourceTag,
+                mode: item.mode,
+              })
             }
           >
             <Image

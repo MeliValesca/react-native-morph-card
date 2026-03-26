@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
 import NativeSourceViewSpec from './specs/NativeMorphCardSource';
-import { setSourceEntry, setSourceLayout, clearSourceEntry } from './MorphChildrenRegistry';
+import { setSourceEntry, setSourceLayout, clearSourceEntry, getTargetConfig } from './MorphChildrenRegistry';
 
 const NativeSourceView = NativeSourceViewSpec ?? View;
 
@@ -85,9 +85,17 @@ export const MorphCardSource = ({
     if (!onPress) return;
     const tag = findNodeHandle(nativeRef.current);
     if (tag != null) {
-      // Create overlay immediately BEFORE navigation to prevent target screen flash.
-      // Delay navigation by one frame so the overlay is drawn before the modal screen
-      // is added — prevents the target screen from flashing on Android.
+      const targetCfg = getTargetConfig(tag);
+      if (targetCfg) {
+        NativeMorphCardModule.setTargetConfig(
+          tag,
+          typeof targetCfg.width === 'number' ? targetCfg.width : 0,
+          typeof targetCfg.height === 'number' ? targetCfg.height : 0,
+          targetCfg.borderRadius != null ? targetCfg.borderRadius : -1,
+          targetCfg.contentOffsetY ?? 0,
+          targetCfg.contentCentered ?? false,
+        );
+      }
       NativeMorphCardModule.prepareExpand(tag);
       requestAnimationFrame(() => onPress(tag));
     }

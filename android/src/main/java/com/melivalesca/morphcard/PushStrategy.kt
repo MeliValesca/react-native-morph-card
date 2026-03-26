@@ -63,8 +63,6 @@ class PushStrategy : MorphAnimationStrategy {
     val sourceScreen = findScreenContainer(sourceView)
     sourceView.sourceScreenContainerRef = if (sourceScreen != null) WeakReference(sourceScreen) else null
 
-    // DON'T hide target screen — let it slide in normally
-
     // Capture card snapshot
     val cardImage = sourceView.captureSnapshot()
 
@@ -77,7 +75,7 @@ class PushStrategy : MorphAnimationStrategy {
     wrapper.y = sourceView.cardTop
     wrapper.clipChildren = true
     wrapper.clipToPadding = true
-    setRoundedCorners(wrapper, sourceView.cardCornerRadiusPx)
+    setRoundedCorners(wrapper, sourceView.cardCornerRadiusPx, suppressShadow = true)
 
     val bgColor = sourceView.cardBgColor
     if (bgColor != null) {
@@ -91,7 +89,8 @@ class PushStrategy : MorphAnimationStrategy {
       sourceView.cardWidth.toInt(), sourceView.cardHeight.toInt()
     )
     wrapper.addView(content)
-    wrapper.translationZ = 16f
+    wrapper.elevation = 0f
+    wrapper.translationZ = 100f
 
     // Force layout so the outline provider can read width/height for clipping
     val w = sourceView.cardWidth.toInt()
@@ -103,6 +102,7 @@ class PushStrategy : MorphAnimationStrategy {
     wrapper.layout(0, 0, w, h)
 
     decorView.addView(wrapper)
+    wrapper.bringToFront()
     sourceView.overlayContainer = wrapper
 
     // Hide source card so it doesn't show as a duplicate during expand animation
@@ -124,18 +124,25 @@ class PushStrategy : MorphAnimationStrategy {
       sourceView.targetViewRef = targetView
     }
 
+    // Don't hide targetView — it's part of the fading-in screen and hiding it
+    // creates a visible hole. The overlay's translationZ keeps it on top.
+
     val decorView = sourceView.getDecorView()
     if (decorView == null) {
       promise.resolve(false)
       return
     }
 
+    // Ensure overlay is above any views added by the navigation transition
+    wrapper.bringToFront()
+
     // Find target screen container for later
     val targetScreen = findScreenContainer(targetView)
     sourceView.targetScreenContainerRef = if (targetScreen != null) WeakReference(targetScreen) else null
 
     val d = sourceView.density
-    val dur = (if (sourceView.expandDuration > 0) sourceView.expandDuration else sourceView.duration).toLong()
+    // Match react-navigation's default push animation duration (450ms)
+    val dur = if (sourceView.expandDuration > 0) sourceView.expandDuration.toLong() else 450L
     val twPx = if (sourceView.pendingTargetWidth > 0) sourceView.pendingTargetWidth * d else sourceView.cardWidth
     val thPx = if (sourceView.pendingTargetHeight > 0) sourceView.pendingTargetHeight * d else sourceView.cardHeight
     val tbrPx = if (sourceView.pendingTargetBorderRadius >= 0) sourceView.pendingTargetBorderRadius * d else sourceView.cardCornerRadiusPx
@@ -156,8 +163,7 @@ class PushStrategy : MorphAnimationStrategy {
 
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = dur
-    // Slight overshoot for a natural bouncy feel when landing at target
-    animator.interpolator = android.view.animation.OvershootInterpolator(1.0f)
+    animator.interpolator = android.view.animation.DecelerateInterpolator(1.2f)
 
     animator.addUpdateListener { anim ->
       val t = anim.animatedValue as Float
@@ -177,9 +183,11 @@ class PushStrategy : MorphAnimationStrategy {
       lp.width = lerp(sourceView.cardWidth, twPx, t).toInt()
       lp.height = lerp(sourceView.cardHeight, thPx, t).toInt()
       wrapper.layoutParams = lp
-      setRoundedCorners(wrapper, lerp(sourceView.cardCornerRadiusPx, tbrPx, t))
+      setRoundedCorners(wrapper, lerp(sourceView.cardCornerRadiusPx, tbrPx, t), suppressShadow = true)
 
       if (totalAngle != 0f) {
+        wrapper.pivotX = lp.width / 2f
+        wrapper.pivotY = lp.height / 2f
         wrapper.rotation = lerp(0f, totalAngle, t)
       }
 
@@ -201,22 +209,38 @@ class PushStrategy : MorphAnimationStrategy {
     animator.addListener(object : android.animation.AnimatorListenerAdapter() {
       override fun onAnimationEnd(animation: android.animation.Animator) {
         Log.d(TAG, "=== PushStrategy animateExpand COMPLETE ===")
-        sourceView.alpha = 1f
+        // Don't restore source alpha — it stays hidden until collapse brings it back
 
         // Apply end rotation to target view
         if (sourceView.rotationEndAngle != 0.0) {
           targetView?.rotation = sourceView.rotationEndAngle.toFloat()
         }
 
-        // For push mode, skip the snapshot handoff — just hide the overlay
-        // and let the target view's live content show directly.
-        // Show children that were hidden by onAttachedToWindow.
         val target = targetView as? MorphCardTargetView
-        target?.showChildren()
 
-        // Keep the overlay alive but hidden for collapse to reuse.
-        wrapper.alpha = 0f
+        // Don't show children or transfer snapshot yet — wait until overlay is gone.
+        // Otherwise children peek through where the overlay doesn't fully cover.
+
+        // Remove overlay instantly, THEN reveal the target
         wrapper.visibility = View.INVISIBLE
+        if (target != null) {
+          val origImg = if (wrapper.childCount > 0) wrapper.getChildAt(0) as? ImageView else null
+          val bitmap = (origImg?.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+          if (bitmap != null) {
+            val frame = if (sourceView.hasWrapper) {
+              val cx = if (sourceView.pendingContentCentered) (twPx - sourceView.cardWidth) / 2f else 0f
+              val cy = if (sourceView.pendingContentCentered) (thPx - sourceView.cardHeight) / 2f
+                else sourceView.pendingContentOffsetY * d
+              RectF(cx, cy, cx + sourceView.cardWidth, cy + sourceView.cardHeight)
+            } else {
+              sourceView.imageFrameForScaleMode(sourceView.scaleMode, sourceView.cardWidth, sourceView.cardHeight,
+                target.width.toFloat(), target.height.toFloat())
+            }
+            target.showSnapshot(bitmap, frame, tbrPx, null)
+            sourceView.mainHandler.postDelayed({ target.fadeOutSnapshot() }, 50)
+          }
+          target.showChildren()
+        }
         promise.resolve(true)
       }
     })
@@ -307,7 +331,7 @@ class PushStrategy : MorphAnimationStrategy {
     wrapper.layoutParams = FrameLayout.LayoutParams(twPx.toInt(), thPx.toInt())
     wrapper.x = unrotatedLoc[0].toFloat()
     wrapper.y = unrotatedLoc[1].toFloat()
-    setRoundedCorners(wrapper, tbrPx)
+    setRoundedCorners(wrapper, tbrPx, suppressShadow = true)
     wrapper.rotation = sourceView.rotationEndAngle.toFloat()
     wrapper.alpha = 1f
     wrapper.visibility = View.VISIBLE
@@ -322,8 +346,7 @@ class PushStrategy : MorphAnimationStrategy {
     val startImgW = content.layoutParams.width.toFloat()
     val startImgH = content.layoutParams.height.toFloat()
 
-    // Snappy overshoot for a natural bouncy feel when landing
-    val collapseInterpolator = android.view.animation.OvershootInterpolator(1.5f)
+    val collapseInterpolator = android.view.animation.DecelerateInterpolator(2.0f)
 
     val animator = ValueAnimator.ofFloat(0f, 1f)
     animator.duration = dur
@@ -345,7 +368,7 @@ class PushStrategy : MorphAnimationStrategy {
       lp.width = lerp(startWidth, sourceView.cardWidth, t).toInt()
       lp.height = lerp(startHeight, sourceView.cardHeight, t).toInt()
       wrapper.layoutParams = lp
-      setRoundedCorners(wrapper, lerp(tbrPx, sourceView.cardCornerRadiusPx, t))
+      setRoundedCorners(wrapper, lerp(tbrPx, sourceView.cardCornerRadiusPx, t), suppressShadow = true)
 
       if (sourceView.rotationEndAngle != 0.0) {
         wrapper.rotation = lerp(sourceView.rotationEndAngle.toFloat(), 0f, t)
@@ -395,7 +418,6 @@ class PushStrategy : MorphAnimationStrategy {
   }
 
   override fun hideTargetScreen(sourceView: MorphCardSourceView, targetView: View?) {
-    // Don't hide for push — let the slide animation happen
     val targetScreen = findScreenContainer(targetView)
     sourceView.targetScreenContainerRef = if (targetScreen != null) WeakReference(targetScreen) else null
   }

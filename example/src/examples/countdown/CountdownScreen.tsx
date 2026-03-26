@@ -86,7 +86,6 @@ export default function CountdownScreen({ navigation }: Props) {
           <MorphCardSource
             backgroundColor="#fff"
             borderRadius={20}
-            expandDuration={400}
             onPress={(sourceTag: number) =>
               navigation.navigate('CountdownDetail', { sourceTag })
             }
@@ -95,7 +94,6 @@ export default function CountdownScreen({ navigation }: Props) {
           </MorphCardSource>
         </View>
         <MorphCardSource
-          presentation="transparentModal"
           width={48}
           height={48}
           borderRadius={24}

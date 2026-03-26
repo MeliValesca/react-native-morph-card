@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import NativeMorphCardModule from './specs/NativeMorphCardModule';
 import NativeTargetViewSpec from './specs/NativeMorphCardTarget';
-import { getSourceEntry } from './MorphChildrenRegistry';
+import { getSourceEntry, setTargetConfig as setTargetConfigRegistry } from './MorphChildrenRegistry';
 
 const NativeTargetView = NativeTargetViewSpec ?? View;
 
@@ -44,6 +44,19 @@ export const MorphCardTarget = ({
     width: number;
     height: number;
   } | null>(null);
+
+  // Store target config in registry so prepareExpand can read it
+  React.useEffect(() => {
+    if (sourceTag) {
+      setTargetConfigRegistry(sourceTag, {
+        width: width as number | string | undefined,
+        height: height as number | string | undefined,
+        borderRadius,
+        contentCentered,
+        contentOffsetY,
+      });
+    }
+  }, [sourceTag, width, height, borderRadius, contentCentered, contentOffsetY]);
 
   // Fetch source size for auto-sizing when width/height not provided
   React.useEffect(() => {

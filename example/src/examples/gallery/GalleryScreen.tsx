@@ -23,11 +23,9 @@ export default function GalleryScreen() {
         return (
           <View key={index} style={{ width, height, padding: 1 }}>
             <MorphCardSource
-              presentation="transparentModal"
               resizeMode="contain"
               borderRadius={0}
-              expandDuration={450}
-              rotations={0}
+              //   rotations={1}
               rotationEndAngle={55}
               onPress={(sourceTag: number) =>
                 navigation.navigate('GalleryDetail', { sourceTag })

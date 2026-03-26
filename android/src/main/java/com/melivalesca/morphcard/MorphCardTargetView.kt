@@ -35,7 +35,6 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     Log.d(TAG, "TargetView attached: id=$id sourceTag=$sourceTag")
 
     if (sourceTag > 0) {
-      // Check if source uses push presentation — if so, don't hide the screen
       val sourceView = MorphCardViewRegistry.getView(sourceTag) as? MorphCardSourceView
       val isPush = sourceView?.presentation == "push"
 
@@ -48,15 +47,12 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
       } else {
         Log.d(TAG, "TargetView: push mode — skipping screen hide")
       }
-      // Hide children until snapshot is in place to avoid flash of un-rotated content
       hideChildren()
     }
   }
 
   override fun onDetachedFromWindow() {
     super.onDetachedFromWindow()
-    // Reset source state when target is removed (e.g. navigation back without morphCollapse)
-    // Don't reset if a collapse animation is in progress.
     if (sourceTag > 0) {
       val sourceView = MorphCardViewRegistry.getView(sourceTag) as? MorphCardSourceView
       if (sourceView != null && sourceView.isExpanded && !sourceView.isCollapsing) {
@@ -73,15 +69,19 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
     MorphCardViewRegistry.unregister(id)
   }
 
+  override fun onViewAdded(child: View) {
+    super.onViewAdded(child)
+    val sourceView = if (sourceTag > 0) MorphCardViewRegistry.getView(sourceTag) as? MorphCardSourceView else null
+    if (sourceView != null && (sourceView.isExpanded || sourceView.hasOverlay)) {
+      child.alpha = 0f
+    }
+  }
+
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
     applyBorderRadiusClipping()
   }
 
-  /**
-   * Draw the snapshot bitmap BEFORE children so React components
-   * (X button, etc.) render on top of it.
-   */
   override fun dispatchDraw(canvas: Canvas) {
     val bmp = snapshotBitmap
     val frame = snapshotFrame
@@ -90,7 +90,6 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
       bgPaint.alpha = (snapshotAlpha * 255).toInt()
       val radiusPx = snapshotCornerRadius
 
-      // Clip to rounded rect if needed
       if (radiusPx > 0) {
         canvas.save()
         val clipPath = Path()
@@ -101,13 +100,11 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
         canvas.clipPath(clipPath)
       }
 
-      // Draw background
       snapshotBgColor?.let { color ->
         bgPaint.color = color
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
       }
 
-      // Draw bitmap in the specified frame
       val src = android.graphics.Rect(0, 0, bmp.width, bmp.height)
       val dst = android.graphics.Rect(
         frame.left.toInt(), frame.top.toInt(),
@@ -120,7 +117,6 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
       }
     }
 
-    // Draw React children on top
     super.dispatchDraw(canvas)
   }
 
@@ -157,8 +153,6 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
 
   fun fadeOutSnapshot() {
     if (snapshotBitmap == null) return
-    // Only fade out if there are React children underneath to reveal.
-    // If no children (scaleMode bitmap-only), keep the snapshot.
     if (childCount == 0) return
     val anim = ValueAnimator.ofFloat(1f, 0f)
     anim.duration = 150
@@ -166,7 +160,6 @@ class MorphCardTargetView(context: Context) : ReactViewGroup(context) {
       snapshotAlpha = it.animatedValue as Float
       invalidate()
     }
-    // Show children before snapshot fades so they're visible underneath
     showChildren()
     anim.addListener(object : android.animation.AnimatorListenerAdapter() {
       override fun onAnimationEnd(animation: android.animation.Animator) {

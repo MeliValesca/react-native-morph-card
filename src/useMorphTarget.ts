@@ -4,7 +4,7 @@ import { getSourceEntry } from './MorphChildrenRegistry';
 
 interface UseMorphTargetOptions {
   sourceTag: number;
-  navigation: { goBack: () => void; setOptions: (opts: any) => void };
+  navigation: { goBack: () => void; setOptions?: (opts: any) => void };
 }
 
 /**
@@ -20,11 +20,11 @@ export function useMorphTarget({ sourceTag, navigation }: UseMorphTargetOptions)
 
     if (presentation === 'push') {
       // For push: start collapse first (hides target, sets up overlay),
-      // then goBack instantly, collapse continues over source screen.
+      // then goBack with the default animation. The overlay stays above
+      // everything during the transition. Works with any animation style.
       const collapsePromise = NativeMorphCardModule.collapse(sourceTag);
       // Wait one frame for collapse to create overlay and hide target
       await new Promise<void>(r => requestAnimationFrame(() => r()));
-      navigation.setOptions({ animation: 'none' });
       navigation.goBack();
       await collapsePromise;
     } else {

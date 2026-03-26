@@ -65,15 +65,17 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const morphModal = {
-  presentation: 'transparentModal' as const,
-  animation: 'none' as const,
+  presentation: 'card' as const,
+  animation: 'slide_from_bottom' as const,
   headerShown: false,
+  contentStyle: { backgroundColor: '#000' },
 };
 
 const morphPush = {
   presentation: 'card' as const,
-  animation: 'slide_from_right' as const,
+  animation: 'slide_from_bottom' as const,
   headerShown: false,
+  contentStyle: { backgroundColor: '#000' },
 };
 
 export default function App() {

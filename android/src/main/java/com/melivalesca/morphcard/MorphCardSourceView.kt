@@ -90,6 +90,14 @@ class MorphCardSourceView(context: Context) : ReactViewGroup(context) {
     applyBorderRadiusClipping()
   }
 
+  override fun invalidate() {
+    super.invalidate()
+    // Re-apply clipping after React Native resets it (e.g. on press state changes)
+    if (borderRadiusDp > 0f) {
+      applyBorderRadiusClipping()
+    }
+  }
+
   private fun applyBorderRadiusClipping() {
     val radiusPx = if (borderRadiusDp > 0f) borderRadiusDp * density else 0f
     setRoundedCorners(this, radiusPx)

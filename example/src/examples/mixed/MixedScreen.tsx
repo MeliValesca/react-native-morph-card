@@ -59,13 +59,10 @@ export default function MixedScreen() {
       {cards.map((card, index) => (
         <View key={card.id} style={{ marginBottom: 20 }}>
           <MorphCardSource
-            presentation="transparentModal"
             backgroundColor={card.type === 'wrapper' ? card.bg : undefined}
             borderRadius={card.id === 'nowrap-2' ? 100 : 16}
             height={card.id === 'nowrap-2' ? 200 : 180}
-            duration={1000}
             resizeMode="cover"
-            expandDuration={350}
             onPress={(sourceTag: number) =>
               navigation.navigate('MixedDetail', { sourceTag, card })
             }

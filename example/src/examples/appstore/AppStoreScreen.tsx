@@ -30,7 +30,6 @@ export default function AppStoreScreen() {
       </Text>
 
       <MorphCardSource
-        presentation="transparentModal"
         onPress={(sourceTag) =>
           navigation.navigate('AppStoreDetail', { sourceTag })
         }
@@ -38,45 +37,45 @@ export default function AppStoreScreen() {
         borderRadius={20}
         height={400}
       >
-          <View style={{ flex: 1 }}>
-            <Image
-              source={CARD_IMAGE}
+        <View style={{ flex: 1 }}>
+          <Image
+            source={CARD_IMAGE}
+            style={{
+              width: '100%',
+              height: 260,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+            }}
+          />
+          <View style={{ padding: 20, flex: 1, justifyContent: 'flex-end' }}>
+            <Text
               style={{
-                width: '100%',
-                height: 260,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
+                fontSize: 12,
+                fontWeight: '700',
+                color: '#8e8e93',
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
               }}
-            />
-            <View style={{ padding: 20, flex: 1, justifyContent: 'flex-end' }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '700',
-                  color: '#8e8e93',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                FEATURED
-              </Text>
-              <Text
-                style={{
-                  fontSize: 24,
-                  fontWeight: '800',
-                  color: '#fff',
-                  marginTop: 4,
-                }}
-              >
-                The Art of Landscape Photography
-              </Text>
-              <Text style={{ fontSize: 14, color: '#aeaeb2', marginTop: 6 }}>
-                Discover breathtaking vistas and learn the techniques behind
-                stunning nature shots.
-              </Text>
-            </View>
+            >
+              FEATURED
+            </Text>
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '800',
+                color: '#fff',
+                marginTop: 4,
+              }}
+            >
+              The Art of Landscape Photography
+            </Text>
+            <Text style={{ fontSize: 14, color: '#aeaeb2', marginTop: 6 }}>
+              Discover breathtaking vistas and learn the techniques behind
+              stunning nature shots.
+            </Text>
           </View>
-        </MorphCardSource>
+        </View>
+      </MorphCardSource>
 
       <View style={{ marginTop: 24 }}>
         <Text

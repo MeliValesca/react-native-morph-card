@@ -29,15 +29,18 @@ internal fun findScreenContainer(view: View?): View? {
  * Apply rounded-corner clipping to a view via its outline provider.
  * If [radiusPx] is <= 0, clipping is disabled.
  */
-internal fun setRoundedCorners(view: View, radiusPx: Float) {
-  if (radiusPx <= 0f) {
+internal fun setRoundedCorners(view: View, radiusPx: Float, suppressShadow: Boolean = false) {
+  if (radiusPx <= 0f && !suppressShadow) {
     view.clipToOutline = false
     return
   }
   view.clipToOutline = true
   view.outlineProvider = object : ViewOutlineProvider() {
     override fun getOutline(v: View, outline: Outline) {
-      outline.setRoundRect(0, 0, v.width, v.height, radiusPx)
+      outline.setRoundRect(0, 0, v.width, v.height, if (radiusPx > 0f) radiusPx else 0f)
+      if (suppressShadow) {
+        outline.alpha = 0f
+      }
     }
   }
 }
