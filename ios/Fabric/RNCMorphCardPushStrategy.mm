@@ -70,8 +70,9 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
   CGPoint startCenter = wrapper.center;
   CGSize startSize = cardFrame.size;
   CGFloat startCornerRadius = cardCornerRadius;
-  __block CFTimeInterval startTime = 0; // Will be set when target appears
+  __block CFTimeInterval startTime = 0;
   __block BOOL animationStarted = NO;
+  __block CGPoint lastKnownCenter = startCenter;
 
   __block NSTimer *animTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/120.0 repeats:YES block:^(NSTimer *timer) {
     // IMPORTANT: Keep source and target hidden every frame (React may reset alpha)
@@ -91,21 +92,22 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
 
     CFTimeInterval elapsed = CACurrentMediaTime() - startTime;
     CGFloat rawT = MIN(1.0, elapsed / dur);
-    // Overshoot curve matching Android's OvershootInterpolator(tension=1.0)
-    // Formula: (t-1)^2 * ((tension+1)*(t-1) + tension) + 1
-    CGFloat tension = 1.0;
-    CGFloat shifted = rawT - 1.0;
-    CGFloat t = shifted * shifted * ((tension + 1.0) * shifted + tension) + 1.0;
+    // Ease-out for all modes — overshoot doesn't work well with position tracking
+    CGFloat t = 1.0 - pow(1.0 - rawT, 3.0);
 
     // Poll target's CURRENT position (it moves as the screen slides in).
+    // Lock position after 80% of animation to avoid end-of-slide jitter.
     CGPoint destCenter;
     if (tv.window) {
       CGPoint origin = [tv convertPoint:CGPointZero toView:nil];
       CGFloat tw = sourceView.pendingTargetWidth > 0 ? sourceView.pendingTargetWidth : cardFrame.size.width;
       CGFloat th = sourceView.pendingTargetHeight > 0 ? sourceView.pendingTargetHeight : cardFrame.size.height;
-      destCenter = CGPointMake(origin.x + tw / 2.0, origin.y + th / 2.0);
+      CGPoint liveCenter = CGPointMake(origin.x + tw / 2.0, origin.y + th / 2.0);
+      if (rawT < 0.8) {
+        lastKnownCenter = liveCenter;
+      }
+      destCenter = lastKnownCenter;
     } else {
-      // Target not ready yet — stay at source position
       destCenter = startCenter;
     }
 
@@ -122,9 +124,27 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
 
     if (content) {
       if (hasWrapper) {
-        content.frame = CGRectMake(targetCx * t, targetCy * t, contentSize.width, contentSize.height);
+        // Center content in the CURRENT wrapper size at every frame
+        CGFloat cx = contentCentered ? (w - contentSize.width) / 2.0 : 0;
+        CGFloat cy = contentCentered ? (h - contentSize.height) / 2.0 : contentOffsetY * t;
+        content.frame = CGRectMake(cx, cy, contentSize.width, contentSize.height);
       } else {
-        content.frame = CGRectMake(0, 0, w, h);
+        // Compute image frame based on scaleMode to avoid stretching
+        CGSize imgSize = cardFrame.size;
+        CGSize containerSize = CGSizeMake(w, h);
+        UIViewContentMode sm = sourceView.scaleMode;
+        if (sm == UIViewContentModeScaleAspectFit) {
+          CGFloat scale = MIN(w / imgSize.width, h / imgSize.height);
+          CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+          content.frame = CGRectMake((w - iw) / 2, (h - ih) / 2, iw, ih);
+        } else if (sm == UIViewContentModeScaleToFill) {
+          content.frame = CGRectMake(0, 0, w, h);
+        } else {
+          // AspectFill
+          CGFloat scale = MAX(w / imgSize.width, h / imgSize.height);
+          CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+          content.frame = CGRectMake((w - iw) / 2, (h - ih) / 2, iw, ih);
+        }
       }
     }
 
@@ -135,8 +155,8 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     if (rawT >= 1.0) {
       [timer invalidate];
 
-      // Restore source and target visibility
-      sourceView.alpha = 1;
+      // Don't restore source alpha — stays hidden until collapse
+      // Restore target visibility
       if (targetView) {
         targetView.alpha = 1;
         targetView.hidden = NO;
@@ -145,12 +165,39 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
           targetView.transform = CGAffineTransformMakeRotation(endAngleRad);
         }
         if ([targetView isKindOfClass:[RNCMorphCardTargetComponentView class]]) {
-          [(RNCMorphCardTargetComponentView *)targetView showChildren];
+          RNCMorphCardTargetComponentView *target = (RNCMorphCardTargetComponentView *)targetView;
+          // Always transfer snapshot — if live children exist, fadeOutSnapshot
+          // reveals them. If not (resizeMode set), snapshot stays.
+          if (content && [content isKindOfClass:[UIImageView class]]) {
+            UIImage *img = ((UIImageView *)content).image;
+            if (img) {
+              CGRect frame = hasWrapper
+                ? CGRectMake(
+                    contentCentered ? (destW - contentSize.width) / 2.0 : 0,
+                    contentCentered ? (destH - contentSize.height) / 2.0 : contentOffsetY,
+                    contentSize.width, contentSize.height)
+                : target.bounds;
+              [target showSnapshot:img
+                       contentMode:hasWrapper ? UIViewContentModeTopLeft : sourceView.scaleMode
+                             frame:frame
+                      cornerRadius:targetCornerRadius
+                   backgroundColor:hasWrapper ? sourceView.backgroundColor : nil];
+              dispatch_after(
+                  dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * NSEC_PER_SEC)),
+                  dispatch_get_main_queue(), ^{
+                    [target fadeOutSnapshot];
+                  });
+            }
+          }
+          [target showChildren];
         }
       }
-      // Hide overlay but keep it for collapse reuse
-      wrapper.alpha = 0;
-      wrapper.hidden = YES;
+      // Fade out overlay over 150ms — gives target time to render live content
+      [UIView animateWithDuration:0.15
+          animations:^{ wrapper.alpha = 0; }
+          completion:^(BOOL finished) {
+            wrapper.hidden = YES;
+          }];
       resolve(@(YES));
     }
   }];
@@ -181,25 +228,25 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     return;
   }
 
-  // Recapture fresh snapshot with afterScreenUpdates:YES for live data
-  sourceView.alpha = 1;
-  UIImage *freshImage = [sourceView captureSnapshotAfterUpdates];
-  sourceView.alpha = 0;
-
   UIView *content = wrapper.subviews.firstObject;
-  if (content && [content isKindOfClass:[UIImageView class]]) {
-    ((UIImageView *)content).image = freshImage;
-    // ScaleToFill: the source snapshot is small but the wrapper starts at target size.
-    // ScaleToFill stretches to fill, then the wrapper shrinks back to source size.
-    ((UIImageView *)content).contentMode = UIViewContentModeScaleToFill;
+  if (sourceView.hasWrapper) {
+    // Wrapper mode: recapture for live data
+    sourceView.alpha = 1;
+    UIImage *freshImage = [sourceView captureSnapshotAfterUpdates];
+    sourceView.alpha = 0;
+    if (content && [content isKindOfClass:[UIImageView class]]) {
+      ((UIImageView *)content).image = freshImage;
+      ((UIImageView *)content).contentMode = UIViewContentModeTopLeft;
+    }
   }
+  // No-wrapper: reuse expand content as-is (no recapture, no stretch)
   if (content) {
     content.alpha = 1;
     content.hidden = NO;
     CGFloat wrapW = wrapper.bounds.size.width;
     CGFloat wrapH = wrapper.bounds.size.height;
     if (sourceView.hasWrapper) {
-      // Wrapper mode: position content centered or offset at source size
+      // Wrapper mode: position content at source size, centered or offset
       CGFloat cx = sourceView.pendingContentCentered
           ? (wrapW - cardFrame.size.width) / 2.0 : 0;
       CGFloat cy = sourceView.pendingContentCentered
@@ -213,13 +260,22 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
     }
   }
 
+  // Remove autoresizingMask BEFORE unhiding to prevent layout pass from resizing content
+  for (UIView *sub in wrapper.subviews) {
+    sub.autoresizingMask = UIViewAutoresizingNone;
+  }
+
   // Unhide the wrapper at its existing position (saved from expand).
   wrapper.alpha = 1;
   wrapper.hidden = NO;
-  // Keep masksToBounds = NO for wrapper mode (shadow rendering)
-  wrapper.clipsToBounds = sourceView.hasWrapper ? NO : YES;
+  wrapper.clipsToBounds = YES;
   [wrapper.layer removeAnimationForKey:@"morphRotation"];
-  wrapper.transform = CGAffineTransformIdentity;
+  // Set the rotation transform explicitly (CA animation was removed above).
+  // The timer will animate it back to identity.
+  CGFloat startAngleForTransform = sourceView.rotationEndAngle * M_PI / 180.0;
+  wrapper.transform = startAngleForTransform != 0
+    ? CGAffineTransformMakeRotation(startAngleForTransform)
+    : CGAffineTransformIdentity;
   // Ensure all subviews are visible
   for (UIView *sub in wrapper.subviews) {
     sub.alpha = 1;
@@ -230,53 +286,108 @@ extern UIView *RNCMorphCardFindScreenContainer(UIView *view);
         wrapper.bounds.size.width, wrapper.bounds.size.height,
         cardFrame.origin.x, cardFrame.origin.y, cardFrame.size.width, cardFrame.size.height);
 
-  // Content is already positioned from expand — no need to reposition
+  // Force content frame to match wrapper's current bounds with scaleMode
+  // to prevent intermittent stretch from stale layout
+  if (content && !sourceView.hasWrapper) {
+    CGFloat ww = wrapper.bounds.size.width;
+    CGFloat wh = wrapper.bounds.size.height;
+    CGSize imgSize = cardFrame.size;
+    UIViewContentMode sm = sourceView.scaleMode;
+    if (sm == UIViewContentModeScaleAspectFit) {
+      CGFloat scale = MIN(ww / imgSize.width, wh / imgSize.height);
+      CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+      content.frame = CGRectMake((ww - iw) / 2, (wh - ih) / 2, iw, ih);
+    } else if (sm == UIViewContentModeScaleToFill) {
+      content.frame = CGRectMake(0, 0, ww, wh);
+    } else {
+      CGFloat scale = MAX(ww / imgSize.width, wh / imgSize.height);
+      CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+      content.frame = CGRectMake((ww - iw) / 2, (wh - ih) / 2, iw, ih);
+    }
+  }
 
   // IMPORTANT: Hide source and target cards during collapse
   sourceView.alpha = 0;
   targetView.alpha = 0;
 
-  // Fixed 450ms with spring timing
-  NSTimeInterval dur = 0.45;
-  UISpringTimingParameters *springTiming = [[UISpringTimingParameters alloc]
-      initWithDampingRatio:0.75
-           initialVelocity:CGVectorMake(0, 0)];
-  UIViewPropertyAnimator *animator = [[UIViewPropertyAnimator alloc]
-      initWithDuration:dur
-      timingParameters:springTiming];
-
-  [animator addAnimations:^{
-    wrapper.bounds = CGRectMake(0, 0, cardFrame.size.width, cardFrame.size.height);
-    wrapper.center = CGPointMake(CGRectGetMidX(cardFrame), CGRectGetMidY(cardFrame));
-    wrapper.layer.cornerRadius = cardCornerRadius;
-    if (content && !sourceView.hasWrapper) {
-      // No-wrapper: autoresizingMask handles it, but explicitly set for wrapper mode
-    }
-    if (content && sourceView.hasWrapper) {
-      content.frame = (CGRect){CGPointZero, content.frame.size};
-    }
-  }];
-
-  // Rotation back to 0
-  CGFloat collapseStartAngle = sourceView.rotationEndAngle * M_PI / 180.0;
-  if (collapseStartAngle != 0) {
-    wrapper.transform = CGAffineTransformMakeRotation(collapseStartAngle);
-    [animator addAnimations:^{
-      wrapper.transform = CGAffineTransformIdentity;
-    }];
+  // Remove autoresizingMask for manual frame control
+  if (content) {
+    content.autoresizingMask = UIViewAutoresizingNone;
   }
 
-  [animator addCompletion:^(UIViewAnimatingPosition pos) {
-    // IMPORTANT: restore source visibility after collapse
-    sourceView.alpha = 1;
-    sourceView.hidden = NO;
-    targetView.alpha = 1;
-    sourceView.isCollapsing = NO;
-    NSLog(@"[MorphCard] push collapse COMPLETE — restoring sourceView.alpha=1");
-    [sourceView collapseCleanupWithContainer:wrapper resolve:resolve];
-  }];
+  NSTimeInterval dur = 0.45;
+  CGPoint startCenter = wrapper.center;
+  CGSize startSize = wrapper.bounds.size;
+  CGFloat startCornerRadius = wrapper.layer.cornerRadius;
+  CGRect startContentFrame = content ? content.frame : CGRectZero;
+  CGFloat startAngle = sourceView.rotationEndAngle * M_PI / 180.0;
 
-  [animator startAnimation];
+  // Timer-driven collapse (same approach as expand) for perfect per-frame control
+  __block CFTimeInterval startTime = CACurrentMediaTime();
+  __block NSTimer *collapseTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/120.0 repeats:YES block:^(NSTimer *timer) {
+    CFTimeInterval elapsed = CACurrentMediaTime() - startTime;
+    CGFloat rawT = MIN(1.0, elapsed / dur);
+    // Ease-out (no overshoot)
+    CGFloat t = 1.0 - pow(1.0 - rawT, 3.0);
+
+    CGFloat w = startSize.width + (cardFrame.size.width - startSize.width) * t;
+    CGFloat h = startSize.height + (cardFrame.size.height - startSize.height) * t;
+    CGFloat cx = startCenter.x + (CGRectGetMidX(cardFrame) - startCenter.x) * t;
+    CGFloat cy = startCenter.y + (CGRectGetMidY(cardFrame) - startCenter.y) * t;
+
+    wrapper.bounds = CGRectMake(0, 0, w, h);
+    wrapper.center = CGPointMake(cx, cy);
+    wrapper.layer.cornerRadius = startCornerRadius + (cardCornerRadius - startCornerRadius) * t;
+
+    if (content) {
+      if (sourceView.hasWrapper) {
+        // Wrapper: move content from centered offset to origin
+        CGFloat fx = startContentFrame.origin.x * (1.0 - t);
+        CGFloat fy = startContentFrame.origin.y * (1.0 - t);
+        content.frame = CGRectMake(fx, fy, startContentFrame.size.width, startContentFrame.size.height);
+      } else {
+        // No-wrapper: compute image frame per scaleMode at current size
+        CGSize imgSize = cardFrame.size;
+        UIViewContentMode sm = sourceView.scaleMode;
+        if (sm == UIViewContentModeScaleAspectFit) {
+          CGFloat scale = MIN(w / imgSize.width, h / imgSize.height);
+          CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+          content.frame = CGRectMake((w - iw) / 2, (h - ih) / 2, iw, ih);
+        } else if (sm == UIViewContentModeScaleToFill) {
+          content.frame = CGRectMake(0, 0, w, h);
+        } else {
+          // AspectFill
+          CGFloat scale = MAX(w / imgSize.width, h / imgSize.height);
+          CGFloat iw = imgSize.width * scale, ih = imgSize.height * scale;
+          content.frame = CGRectMake((w - iw) / 2, (h - ih) / 2, iw, ih);
+        }
+      }
+    }
+
+    if (startAngle != 0) {
+      wrapper.transform = CGAffineTransformMakeRotation(startAngle * (1.0 - t));
+    }
+
+    // Keep source/target hidden every frame
+    sourceView.alpha = 0;
+    targetView.alpha = 0;
+
+    if (rawT >= 1.0) {
+      [timer invalidate];
+      // Show source, then crossfade wrapper out over 100ms
+      sourceView.alpha = 1;
+      sourceView.hidden = NO;
+      targetView.alpha = 1;
+      sourceView.isCollapsing = NO;
+
+      [UIView animateWithDuration:0.1
+          animations:^{ wrapper.alpha = 0; }
+          completion:^(BOOL finished) {
+            wrapper.hidden = YES;
+            [sourceView collapseCleanupWithContainer:wrapper resolve:resolve];
+          }];
+    }
+  }];
 }
 
 @end

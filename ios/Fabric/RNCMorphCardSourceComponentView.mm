@@ -297,17 +297,6 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
     content.frame = (CGRect){CGPointZero, _cardFrame.size};
     [wrapper addSubview:content];
 
-    if (_isPush) {
-      // Push wrapper mode: shadow below the card.
-      // masksToBounds = NO for shadow, content clips itself with cornerRadius.
-      wrapper.layer.masksToBounds = NO;
-      wrapper.layer.shadowColor = [UIColor blackColor].CGColor;
-      wrapper.layer.shadowOffset = CGSizeMake(0, 8);
-      wrapper.layer.shadowOpacity = 0.12;
-      wrapper.layer.shadowRadius = 5;
-      // Content clips itself since wrapper can't (masksToBounds = NO)
-      content.layer.cornerRadius = _cardCornerRadius;
-    }
   } else {
     wrapper = [[UIView alloc] initWithFrame:CGRectZero];
     wrapper.bounds = CGRectMake(0, 0, _cardFrame.size.width, _cardFrame.size.height);
@@ -328,27 +317,7 @@ static CGRect imageFrameForScaleMode(UIViewContentMode mode,
   [window addSubview:wrapper];
   _wrapperView = wrapper;
 
-  // Start a subtle scale-up during the delay before expandToTarget fires.
-  // Use bounds/center instead of transform to avoid cornerRadius distortion.
-  CGRect startBounds = wrapper.bounds;
-  CGPoint startCenter = wrapper.center;
-  CGFloat scale = 1.05;
-  [UIView animateWithDuration:0.15
-                        delay:0
-                      options:UIViewAnimationOptionCurveEaseOut
-                   animations:^{
-                     wrapper.bounds = CGRectMake(0, 0,
-                       startBounds.size.width * scale,
-                       startBounds.size.height * scale);
-                     // Scale content with wrapper so edges don't show
-                     UIView *content = wrapper.subviews.firstObject;
-                     if (content) {
-                       content.frame = CGRectMake(0, 0,
-                         startBounds.size.width * scale,
-                         startBounds.size.height * scale);
-                     }
-                   }
-                   completion:nil];
+  // No pre-animation — the expand timer handles everything cleanly.
 }
 
 - (void)expandToTarget:(UIView *)targetView

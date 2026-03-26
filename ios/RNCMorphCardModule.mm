@@ -60,33 +60,51 @@ RCT_EXPORT_METHOD(expand
                   : (double)targetTag resolve
                   : (RCTPromiseResolveBlock)resolve reject
                   : (RCTPromiseRejectBlock)reject) {
-  dispatch_after(
-      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(150 * NSEC_PER_MSEC)),
-      dispatch_get_main_queue(), ^{
-        UIView *sourceView =
-            [[RNCMorphCardViewRegistry shared]
-                viewForTag:(NSInteger)sourceTag];
-
-        UIView *targetView =
-            [[RNCMorphCardViewRegistry shared]
-                viewForTag:(NSInteger)targetTag];
+  // Poll until target is registered, laid out, AND target config is set.
+  // Same approach as Android — no fixed delay.
+  dispatch_async(dispatch_get_main_queue(), ^{
+  __block int attempts = 0;
+  __block NSTimer *pollTimer = [NSTimer scheduledTimerWithTimeInterval:1.0/60.0
+                                                              repeats:YES
+                                                                block:^(NSTimer *timer) {
+    attempts++;
+    UIView *targetView =
+        [[RNCMorphCardViewRegistry shared] viewForTag:(NSInteger)targetTag];
 
 #ifdef RCT_NEW_ARCH_ENABLED
-        RNCMorphCardSourceComponentView *src = nil;
-        if ([sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
-          src = (RNCMorphCardSourceComponentView *)sourceView;
-        } else {
-          src = self->_cachedSources[@((NSInteger)sourceTag)];
-        }
-        if (src) {
-          [src expandToTarget:targetView resolve:resolve];
-        } else {
-          resolve(@(NO));
-        }
-#else
+    RNCMorphCardSourceComponentView *src = nil;
+    UIView *sourceView =
+        [[RNCMorphCardViewRegistry shared] viewForTag:(NSInteger)sourceTag];
+    if ([sourceView isKindOfClass:[RNCMorphCardSourceComponentView class]]) {
+      src = (RNCMorphCardSourceComponentView *)sourceView;
+    } else {
+      src = self->_cachedSources[@((NSInteger)sourceTag)];
+    }
+
+    // Wait for: target registered + non-zero size + target config set
+    BOOL targetReady = targetView && targetView.bounds.size.width > 0;
+    BOOL configReady = src && (src.pendingTargetWidth > 0 || src.pendingTargetHeight > 0);
+
+    if (!targetReady || !configReady) {
+      if (attempts > 120) { // 2 second timeout
+        [timer invalidate];
         resolve(@(NO));
+      }
+      return;
+    }
+
+    [timer invalidate];
+    if (src) {
+      [src expandToTarget:targetView resolve:resolve];
+    } else {
+      resolve(@(NO));
+    }
+#else
+    [timer invalidate];
+    resolve(@(NO));
 #endif
-      });
+  }];
+  }); // dispatch_async
 }
 
 RCT_EXPORT_METHOD(getSourceSize
